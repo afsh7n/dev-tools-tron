@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dev tools — Tron address, scan, sign</title>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.15.0/dist/ethers.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --panel: #1a222c;
+      --line: #2a3644;
+      --text: #e8eef4;
+      --muted: #8b9aab;
+      --accent: #3d9cf0;
+      --ok: #3ecf8e;
+      --err: #f07178;
+      --warn: #e6c07b;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font: 14px/1.45 ui-sans-serif, system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    header {
+      padding: 20px 24px 8px;
+      border-bottom: 1px solid var(--line);
+    }
+    header h1 { margin: 0 0 6px; font-size: 18px; font-weight: 650; }
+    header p { margin: 0; color: var(--muted); max-width: 72ch; }
+    main {
+      display: grid;
+      gap: 16px;
+      padding: 16px 24px 32px;
+      max-width: 1100px;
+    }
+    @media (min-width: 900px) {
+      main { grid-template-columns: 1fr 1fr; }
+      .wide { grid-column: 1 / -1; }
+    }
+    section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 16px;
+    }
+    h2 { margin: 0 0 12px; font-size: 15px; }
+    label { display: block; color: var(--muted); font-size: 12px; margin: 10px 0 4px; }
+    input, textarea, select {
+      width: 100%;
+      background: #0f1419;
+      color: var(--text);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 8px 10px;
+      font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    textarea { min-height: 120px; resize: vertical; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+    button {
+      background: var(--accent);
+      color: #061018;
+      border: 0;
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-weight: 650;
+      cursor: pointer;
+    }
+    button.secondary { background: #2a3644; color: var(--text); }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .hint { color: var(--muted); font-size: 12px; margin-top: 8px; }
+    .ok { color: var(--ok); }
+    .err { color: var(--err); }
+    .warn { color: var(--warn); }
+    .key { filter: blur(5px); }
+    .key.show { filter: none; }
+    pre {
+      margin: 10px 0 0;
+      background: #0f1419;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+      overflow: auto;
+      font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Dev tools</h1>
+    <p>
+      One local HTML file. Address + sign run in the browser with <code>ethers</code> (CDN).
+      Native gRPC cannot run in a page, so Scan/Collect build the exact proto JSON for Postman or grpcurl.
+    </p>
+  </header>
+  <main>
+    <section>
+      <h2>1. Address</h2>
+      <label>Address</label>
+      <input id="address" readonly placeholder="Generate or paste a key" />
+      <label>Private key</label>
+      <input id="privateKey" class="key" readonly placeholder="64 hex chars" />
+      <div class="actions">
+        <button type="button" id="btnGenerate">Generate</button>
+        <button type="button" class="secondary" id="btnToggleKey">Show key</button>
+        <button type="button" class="secondary" id="btnDownload">Download JSON</button>
+        <button type="button" class="secondary" id="btnLoad">Load JSON</button>
+        <input id="file" type="file" accept="application/json,.json" hidden />
+      </div>
+      <p class="hint warn">Key never leaves this tab. Do not commit wallet.json.</p>
+      <p id="walletStatus" class="hint"></p>
+    </section>
+
+    <section>
+      <h2>2. Scan (watch-list ADD)</h2>
+      <label>Address to watch</label>
+      <input id="scanAddress" placeholder="Uses generated address if empty" />
+      <div class="actions">
+        <button type="button" id="btnScan">Build BatchUpdateAddresses JSON</button>
+        <button type="button" class="secondary" id="btnCopyScan">Copy</button>
+      </div>
+      <p class="hint">gRPC: <code>tron_scanner.AddressService/BatchUpdateAddresses</code> + metadata <code>x-api-key</code></p>
+      <pre id="scanOut"></pre>
+    </section>
+
+    <section class="wide">
+      <h2>3. Sign Collect tx</h2>
+      <div class="row">
+        <div>
+          <label>to_address</label>
+          <input id="to" placeholder="T… recipient" />
+        </div>
+        <div>
+          <label>amount (Atomic Unit integer, sun for TRX)</label>
+          <input id="amount" placeholder="1000000" />
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label>transaction_id</label>
+          <input id="transactionId" value="tx-1" />
+        </div>
+        <div>
+          <label>token_id</label>
+          <input id="tokenId" value="1" />
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label>TRC-20 contract (empty = native TRX)</label>
+          <input id="contract" placeholder="TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t" />
+        </div>
+        <div>
+          <label>fee_limit (sun, TRC-20)</label>
+          <input id="feeLimit" value="100000000" />
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label>ref_block_bytes (4 hex)</label>
+          <input id="refBlockBytes" placeholder="block number &amp; 0xffff" />
+        </div>
+        <div>
+          <label>ref_block_hash (16 hex)</label>
+          <input id="refBlockHash" placeholder="8 bytes of the reference block id" />
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label>expiration (ms, empty = now + 60s)</label>
+          <input id="expiration" placeholder="1700000060000" />
+        </div>
+        <div>
+          <label>timestamp (ms, empty = now)</label>
+          <input id="timestamp" placeholder="1700000000000" />
+        </div>
+      </div>
+      <div class="actions">
+        <button type="button" id="btnSign">Sign Collect item</button>
+        <button type="button" class="secondary" id="btnCollect">Build CollectRequest JSON</button>
+        <button type="button" class="secondary" id="btnCopySign">Copy last JSON</button>
+      </div>
+      <p id="signStatus" class="hint"></p>
+      <pre id="signOut"></pre>
+    </section>
+  </main>
+  <script>
+    const ATOMIC = /^(0|[1-9][0-9]{0,64})$/;
+    const TOKEN_ID = /^[1-9][0-9]*$/;
+    const TX_ID = /^[A-Za-z0-9_-]{1,64}$/;
+    const B58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+    const TRANSFER_TYPE_URL = "type.googleapis.com/protocol.TransferContract";
+    const TRIGGER_TYPE_URL = "type.googleapis.com/protocol.TriggerSmartContract";
+    const ZERO_ADDRESS = "T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb";
+
+    const $ = (id) => document.getElementById(id);
+    const statusEl = (id, text, cls) => {
+      const el = $(id);
+      el.className = "hint " + (cls || "");
+      el.textContent = text;
+    };
+    const copy = async (text) => {
+      await navigator.clipboard.writeText(text);
+    };
+
+    let lastJson = "";
+
+    const hexToBytes = (hex) => {
+      const h = String(hex).replace(/^0x/i, "");
+      if (!/^[0-9a-fA-F]*$/.test(h) || h.length % 2 !== 0) {
+        throw new Error("Invalid hex.");
+      }
+      const out = new Uint8Array(h.length / 2);
+      for (let i = 0; i < out.length; i += 1) {
+        out[i] = parseInt(h.slice(i * 2, i * 2 + 2), 16);
+      }
+      return out;
+    };
+
+    const bytesToHex = (bytes) =>
+      [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
+
+    const concat = (parts) => {
+      const len = parts.reduce((n, p) => n + p.length, 0);
+      const out = new Uint8Array(len);
+      let offset = 0;
+      for (const part of parts) {
+        out.set(part, offset);
+        offset += part.length;
+      }
+      return out;
+    };
+
+    const encodeVarint = (value) => {
+      let n = BigInt(value);
+      if (n < 0n) throw new Error("Protobuf varint must be >= 0.");
+      const out = [];
+      while (n >= 0x80n) {
+        out.push(Number((n & 0x7fn) | 0x80n));
+        n >>= 7n;
+      }
+      out.push(Number(n));
+      return Uint8Array.from(out);
+    };
+
+    const fieldKey = (field, wire) => encodeVarint((field << 3) | wire);
+    const fieldVarint = (field, value) => concat([fieldKey(field, 0), encodeVarint(value)]);
+    const fieldBytes = (field, data) =>
+      concat([fieldKey(field, 2), encodeVarint(data.length), data]);
+
+    const sha256 = (bytes) => hexToBytes(ethers.sha256(ethers.hexlify(bytes)));
+
+    const base58Encode = (bytes) => {
+      let zeros = 0;
+      while (zeros < bytes.length && bytes[zeros] === 0) zeros += 1;
+      const digits = [0];
+      for (let i = zeros; i < bytes.length; i += 1) {
+        let carry = bytes[i];
+        for (let j = 0; j < digits.length; j += 1) {
+          carry += digits[j] << 8;
+          digits[j] = carry % 58;
+          carry = (carry / 58) | 0;
+        }
+        while (carry > 0) {
+          digits.push(carry % 58);
+          carry = (carry / 58) | 0;
+        }
+      }
+      let out = "1".repeat(zeros);
+      for (let i = digits.length - 1; i >= 0; i -= 1) out += B58[digits[i]];
+      return out;
+    };
+
+    const base58Decode = (text) => {
+      if (!/^[1-9A-HJ-NP-Za-km-z]+$/.test(text)) return null;
+      const bytes = [0];
+      for (const ch of text) {
+        let carry = B58.indexOf(ch);
+        if (carry < 0) return null;
+        for (let j = 0; j < bytes.length; j += 1) {
+          carry += bytes[j] * 58;
+          bytes[j] = carry & 0xff;
+          carry >>= 8;
+        }
+        while (carry > 0) {
+          bytes.push(carry & 0xff);
+          carry >>= 8;
+        }
+      }
+      let zeros = 0;
+      while (zeros < text.length && text[zeros] === "1") zeros += 1;
+      return Uint8Array.from([...new Array(zeros).fill(0), ...bytes.reverse()]);
+    };
+
+    const base58Check = (payload) => {
+      const checksum = sha256(sha256(payload)).slice(0, 4);
+      return base58Encode(concat([payload, checksum]));
+    };
+
+    const decodeBase58Check = (address) => {
+      const decoded = base58Decode(address);
+      if (!decoded || decoded.length < 5) return null;
+      const payload = decoded.slice(0, decoded.length - 4);
+      const checksum = decoded.slice(decoded.length - 4);
+      const expected = sha256(sha256(payload)).slice(0, 4);
+      for (let i = 0; i < 4; i += 1) {
+        if (checksum[i] !== expected[i]) return null;
+      }
+      return payload;
+    };
+
+    const addressPayload = (address) => {
+      const trimmed = address.trim();
+      if (trimmed.startsWith("T")) {
+        const payload = decodeBase58Check(trimmed);
+        if (!payload || payload.length !== 21 || payload[0] !== 0x41) return null;
+        return payload;
+      }
+      const hex = trimmed.replace(/^0x/i, "");
+      if (!/^[0-9a-fA-F]+$/.test(hex) || hex.length % 2 !== 0) return null;
+      const bytes = hexToBytes(hex);
+      if (bytes.length === 20) return concat([Uint8Array.of(0x41), bytes]);
+      if (bytes.length === 21 && bytes[0] === 0x41) return bytes;
+      return null;
+    };
+
+    const isTronAddress = (address) => addressPayload(address) != null;
+
+    const normalizeAddress = (address) => {
+      const payload = addressPayload(address);
+      if (!payload) throw new Error("Invalid Tron address.");
+      return base58Check(payload);
+    };
+
+    const addressHex = (address) => bytesToHex(addressPayload(address));
+
+    const privateKeyHex = (value) => {
+      const hex = String(value || "").trim().replace(/^0x/i, "");
+      if (!/^[0-9a-fA-F]{64}$/.test(hex)) throw new Error("Private key must be 32 bytes hex.");
+      return hex.toLowerCase();
+    };
+
+    const addressFromPrivateKey = (value) => {
+      const hex = privateKeyHex(value);
+      const signingKey = new ethers.SigningKey("0x" + hex);
+      const hash = ethers.keccak256("0x" + signingKey.publicKey.slice(4));
+      const payload = hexToBytes("41" + hash.slice(-40));
+      return base58Check(payload);
+    };
+
+    const walletFromForm = () => {
+      const key = $("privateKey").value.trim();
+      if (!key) throw new Error("Generate or load a private key first.");
+      return { privateKey: privateKeyHex(key), address: addressFromPrivateKey(key) };
+    };
+
+    const jsonAmount = (amount) =>
+      BigInt(amount) <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(amount) : amount;
+
+    const encodeTransfer = (owner, to, amount) => {
+      const parts = [fieldBytes(1, owner), fieldBytes(2, to)];
+      if (BigInt(amount) !== 0n) parts.push(fieldVarint(3, amount));
+      return concat(parts);
+    };
+
+    const encodeTrigger = (owner, contract, data) =>
+      concat([fieldBytes(1, owner), fieldBytes(2, contract), fieldBytes(4, data)]);
+
+    const encodeAny = (typeUrl, value) =>
+      concat([
+        fieldBytes(1, new TextEncoder().encode(typeUrl)),
+        fieldBytes(2, value),
+      ]);
+
+    const encodeRaw = ({ refBlockBytes, refBlockHash, expiration, timestamp, feeLimit, contractType, typeUrl, parameter }) => {
+      const any = encodeAny(typeUrl, parameter);
+      const contract = concat([fieldVarint(1, contractType), fieldBytes(2, any)]);
+      const parts = [
+        fieldBytes(1, refBlockBytes),
+        fieldBytes(4, refBlockHash),
+        fieldVarint(8, expiration),
+        fieldBytes(11, contract),
+        fieldVarint(14, timestamp),
+      ];
+      if (feeLimit != null) parts.push(fieldVarint(18, feeLimit));
+      return concat(parts);
+    };
+
+    const signRaw = (privateKey, raw) => {
+      const txID = bytesToHex(sha256(raw));
+      const sig = new ethers.SigningKey("0x" + privateKey).sign(ethers.hexlify(sha256(raw)));
+      const signature =
+        sig.r.slice(2).padStart(64, "0") +
+        sig.s.slice(2).padStart(64, "0") +
+        Number(sig.v).toString(16).padStart(2, "0");
+      return { txID, signature: signature.toLowerCase() };
+    };
+
+    $("btnGenerate").onclick = () => {
+      const wallet = ethers.Wallet.createRandom();
+      const privateKey = wallet.privateKey.slice(2);
+      const address = addressFromPrivateKey(privateKey);
+      $("address").value = address;
+      $("privateKey").value = privateKey;
+      $("scanAddress").value = address;
+      statusEl("walletStatus", "New keypair in this tab only.", "ok");
+    };
+
+    $("btnToggleKey").onclick = () => {
+      $("privateKey").classList.toggle("show");
+      $("btnToggleKey").textContent = $("privateKey").classList.contains("show")
+        ? "Hide key"
+        : "Show key";
+    };
+
+    $("btnDownload").onclick = () => {
+      const address = $("address").value.trim();
+      const privateKey = $("privateKey").value.trim();
+      if (!address || !privateKey) {
+        statusEl("walletStatus", "Generate a wallet first.", "err");
+        return;
+      }
+      const blob = new Blob(
+        [JSON.stringify({ address, privateKey }, null, 2)],
+        { type: "application/json" },
+      );
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "wallet.json";
+      a.click();
+      URL.revokeObjectURL(a.href);
+    };
+
+    $("btnLoad").onclick = () => $("file").click();
+    $("file").onchange = async (event) => {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+      try {
+        const parsed = JSON.parse(await file.text());
+        const privateKey = privateKeyHex(parsed.privateKey || parsed.private_key);
+        const address = addressFromPrivateKey(privateKey);
+        if (parsed.address && normalizeAddress(parsed.address) !== address) {
+          throw new Error("private key does not match address.");
+        }
+        $("address").value = address;
+        $("privateKey").value = privateKey;
+        $("scanAddress").value = address;
+        statusEl("walletStatus", "Loaded " + file.name, "ok");
+      } catch (error) {
+        statusEl("walletStatus", error.message, "err");
+      }
+    };
+
+    const scanPayload = () => {
+      const address = ($("scanAddress").value || $("address").value).trim();
+      if (!isTronAddress(address)) throw new Error("Need a valid address to scan.");
+      return {
+        operation: "ADDRESS_OPERATION_ADD",
+        addresses: [normalizeAddress(address)],
+      };
+    };
+
+    $("btnScan").onclick = () => {
+      try {
+        const payload = scanPayload();
+        lastJson = JSON.stringify(payload, null, 2);
+        $("scanOut").textContent = lastJson;
+      } catch (error) {
+        $("scanOut").textContent = error.message;
+      }
+    };
+
+    $("btnCopyScan").onclick = async () => {
+      if (!$("scanOut").textContent) return;
+      await copy($("scanOut").textContent);
+    };
+
+    const buildItem = async () => {
+      const wallet = walletFromForm();
+      const to = $("to").value.trim();
+      const amount = $("amount").value.trim();
+      const transactionId = $("transactionId").value.trim();
+      const tokenId = $("tokenId").value.trim();
+      const contract = $("contract").value.trim();
+      const refBlockBytesHex = $("refBlockBytes").value.trim();
+      const refBlockHashHex = $("refBlockHash").value.trim();
+      if (!isTronAddress(to)) throw new Error("to_address is invalid.");
+      if (!ATOMIC.test(amount)) throw new Error("amount must be an Atomic Unit integer string.");
+      if (!TX_ID.test(transactionId)) {
+        throw new Error('transaction_id must be 1-64 chars of letters, digits, "_" or "-".');
+      }
+      if (!TOKEN_ID.test(tokenId)) throw new Error("token_id must be a positive integer string.");
+      if (contract && !isTronAddress(contract)) throw new Error("contract is invalid.");
+      if (!/^[0-9a-fA-F]{4}$/.test(refBlockBytesHex)) {
+        throw new Error("ref_block_bytes must be 4 hex chars.");
+      }
+      if (!/^[0-9a-fA-F]{16}$/.test(refBlockHashHex)) {
+        throw new Error("ref_block_hash must be 16 hex chars.");
+      }
+
+      const from = normalizeAddress(wallet.address);
+      const toAddress = normalizeAddress(to);
+      if (from === toAddress || from === ZERO_ADDRESS || toAddress === ZERO_ADDRESS) {
+        throw new Error("from_address and to_address must differ and cannot be the zero address.");
+      }
+
+      const now = Date.now();
+      const expirationText = $("expiration").value.trim();
+      const timestampText = $("timestamp").value.trim();
+      const expiration = BigInt(expirationText || String(now + 60_000));
+      const timestamp = BigInt(timestampText || String(now));
+      const maxSafe = BigInt(Number.MAX_SAFE_INTEGER);
+      if (expiration < 0n || timestamp < 0n || expiration > maxSafe || timestamp > maxSafe) {
+        throw new Error("expiration and timestamp must be safe integers >= 0.");
+      }
+
+      const ownerBytes = addressPayload(from);
+      let parameter;
+      let contractType;
+      let typeUrl;
+      let feeLimit = null;
+      let value;
+      if (contract) {
+        const contractAddress = normalizeAddress(contract);
+        if (contractAddress === from || contractAddress === ZERO_ADDRESS) {
+          throw new Error("contract is invalid.");
+        }
+        const toWord = bytesToHex(addressPayload(toAddress).slice(1)).padStart(64, "0");
+        const amountWord = BigInt(amount).toString(16).padStart(64, "0");
+        const data = hexToBytes("a9059cbb" + toWord + amountWord);
+        parameter = encodeTrigger(ownerBytes, addressPayload(contractAddress), data);
+        contractType = 31;
+        typeUrl = TRIGGER_TYPE_URL;
+        feeLimit = BigInt($("feeLimit").value.trim() || "100000000");
+        if (feeLimit <= 0n || feeLimit > BigInt(Number.MAX_SAFE_INTEGER)) {
+          throw new Error("fee_limit must be a positive safe integer.");
+        }
+        value = {
+          owner_address: addressHex(from),
+          contract_address: addressHex(contractAddress),
+          data: bytesToHex(data),
+          call_value: 0,
+        };
+      } else {
+        parameter = encodeTransfer(ownerBytes, addressPayload(toAddress), amount);
+        contractType = 1;
+        typeUrl = TRANSFER_TYPE_URL;
+        value = {
+          amount: jsonAmount(amount),
+          owner_address: addressHex(from),
+          to_address: addressHex(toAddress),
+        };
+      }
+
+      const raw = encodeRaw({
+        refBlockBytes: hexToBytes(refBlockBytesHex),
+        refBlockHash: hexToBytes(refBlockHashHex),
+        expiration,
+        timestamp,
+        feeLimit,
+        contractType,
+        typeUrl,
+        parameter,
+      });
+      const signed = signRaw(wallet.privateKey, raw);
+      const rawData = {
+        contract: [
+          {
+            parameter: { value, type_url: typeUrl },
+            type: contract ? "TriggerSmartContract" : "TransferContract",
+          },
+        ],
+        ref_block_bytes: refBlockBytesHex.toLowerCase(),
+        ref_block_hash: refBlockHashHex.toLowerCase(),
+        expiration: Number(expiration),
+        timestamp: Number(timestamp),
+      };
+      if (feeLimit != null) rawData.fee_limit = Number(feeLimit);
+      const signedTx = {
+        visible: false,
+        txID: signed.txID,
+        raw_data: rawData,
+        raw_data_hex: bytesToHex(raw),
+        signature: [signed.signature],
+      };
+
+      return {
+        transaction_id: transactionId,
+        from_address: from,
+        to_address: toAddress,
+        token_id: tokenId,
+        amount,
+        signed_tx: JSON.stringify(signedTx),
+      };
+    };
+
+    $("btnSign").onclick = async () => {
+      try {
+        const item = await buildItem();
+        lastJson = JSON.stringify(item, null, 2);
+        $("signOut").textContent = lastJson;
+        statusEl("signStatus", "Signed in-browser. Ready for Collect.", "ok");
+      } catch (error) {
+        statusEl("signStatus", error.message, "err");
+      }
+    };
+
+    $("btnCollect").onclick = async () => {
+      try {
+        const item = await buildItem();
+        const request = { items: [item] };
+        lastJson = JSON.stringify(request, null, 2);
+        $("signOut").textContent = lastJson;
+        statusEl("signStatus", "CollectRequest JSON. Send via Postman/grpcurl — browser cannot speak native gRPC.", "warn");
+      } catch (error) {
+        statusEl("signStatus", error.message, "err");
+      }
+    };
+
+    $("btnCopySign").onclick = async () => {
+      if (!lastJson) return;
+      await copy(lastJson);
+      statusEl("signStatus", "Copied.", "ok");
+    };
+  </script>
+</body>
+</html>
