@@ -72,6 +72,43 @@
     button.secondary { background: #2a3644; color: var(--text); }
     button:disabled { opacity: 0.5; cursor: not-allowed; }
     .hint { color: var(--muted); font-size: 12px; margin-top: 8px; }
+    .field .hint { margin-top: 4px; font-size: 11px; }
+    .group { border-top: 1px solid var(--line); margin-top: 18px; padding-top: 2px; }
+    .group h3 {
+      margin: 14px 0 0;
+      font-size: 11px;
+      font-weight: 650;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .group-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 14px; }
+    .group-head h3 { margin: 0; }
+    .label-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 10px 0 4px; }
+    .label-row label { margin: 0; }
+    .token-only { color: var(--err); }
+    .token-field input { border-color: rgba(240, 113, 120, 0.45); }
+    button.mini {
+      padding: 3px 8px;
+      font-size: 11px;
+      font-weight: 600;
+      line-height: 1.3;
+      border-radius: 6px;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    button.small { padding: 6px 10px; font-size: 12px; }
+    .note {
+      margin: 10px 0 0;
+      padding: 8px 10px;
+      background: #0f1419;
+      border: 1px solid var(--line);
+      border-left: 3px solid var(--accent);
+      border-radius: 8px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .note strong { color: var(--text); }
     .ok { color: var(--ok); }
     .err { color: var(--err); }
     .warn { color: var(--warn); }
@@ -95,7 +132,9 @@
     <h1>Dev tools</h1>
     <p>
       One local HTML file. Address + sign run in the browser with <code>ethers</code> (CDN).
-      Native gRPC cannot run in a page, so Scan/Collect build the exact proto JSON for Postman or grpcurl.
+      Native TRX and USDT (TRC-20) are both supported; fees are paid by burning TRX, so there are no
+      bandwidth or energy fields to fill. Native gRPC cannot run in a page, so Scan/Collect build the
+      exact proto JSON for Postman or grpcurl.
     </p>
   </header>
   <main>
@@ -130,56 +169,105 @@
 
     <section class="wide">
       <h2>3. Sign Collect tx</h2>
-      <div class="row">
-        <div>
-          <label>to_address</label>
-          <input id="to" placeholder="T… recipient" />
-        </div>
-        <div>
-          <label>amount (Atomic Unit integer, sun for TRX)</label>
-          <input id="amount" placeholder="1000000" />
-        </div>
-      </div>
-      <div class="row">
-        <div>
-          <label>transaction_id</label>
-          <input id="transactionId" value="tx-1" />
-        </div>
-        <div>
-          <label>token_id</label>
-          <input id="tokenId" value="1" />
-        </div>
-      </div>
-      <div class="row">
-        <div>
-          <label>TRC-20 contract (empty = native TRX)</label>
-          <input id="contract" placeholder="TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t" />
-        </div>
-        <div>
-          <label>fee_limit (sun, TRC-20)</label>
-          <input id="feeLimit" value="100000000" />
+      <p class="hint">
+        One form for both assets: leave <code>contract</code> empty to sign native TRX, or fill it to sign
+        USDT/TRC-20. Fields marked in red are used only in the USDT/TRC-20 case.
+      </p>
+      <p class="note">
+        <strong>Fees:</strong> there are no bandwidth or energy fields. With no staked resources the network
+        burns TRX from the sender. For USDT/TRC-20, <code>fee_limit</code> is the maximum TRX that may be
+        burned for energy.
+      </p>
+
+      <div class="group">
+        <h3>Transfer — required for both</h3>
+        <div class="row">
+          <div class="field">
+            <label for="to">to_address</label>
+            <input id="to" placeholder="T… recipient" />
+            <p class="hint">Recipient address: Base58 <code>T…</code> or <code>41…</code> hex.</p>
+          </div>
+          <div class="field">
+            <label for="amount">amount</label>
+            <input id="amount" placeholder="1000000" />
+            <p class="hint">
+              Atomic units: TRX in sun (<code>1 TRX = 1000000</code>); USDT has 6 decimals
+              (<code>1 USDT = 1000000</code>).
+            </p>
+          </div>
         </div>
       </div>
-      <div class="row">
-        <div>
-          <label>ref_block_bytes (4 hex)</label>
-          <input id="refBlockBytes" placeholder="block number &amp; 0xffff" />
-        </div>
-        <div>
-          <label>ref_block_hash (16 hex)</label>
-          <input id="refBlockHash" placeholder="8 bytes of the reference block id" />
-        </div>
-      </div>
-      <div class="row">
-        <div>
-          <label>expiration (ms, empty = now + 60s)</label>
-          <input id="expiration" placeholder="1700000060000" />
-        </div>
-        <div>
-          <label>timestamp (ms, empty = now)</label>
-          <input id="timestamp" placeholder="1700000000000" />
+
+      <div class="group">
+        <h3>Scanned item — required for both</h3>
+        <div class="row">
+          <div class="field">
+            <label for="transactionId">transaction_id</label>
+            <input id="transactionId" value="tx-1" />
+            <p class="hint">Scanner item id, not the on-chain txID.</p>
+          </div>
+          <div class="field">
+            <label for="tokenId">token_id</label>
+            <input id="tokenId" value="1" />
+            <p class="hint">Scanner catalog token id for TRX or USDT.</p>
+          </div>
         </div>
       </div>
+
+      <div class="group">
+        <div class="group-head">
+          <h3>Chain validity — required for both</h3>
+          <button type="button" class="secondary small" id="btnFetchBlock">Fetch latest block</button>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label for="refBlockBytes">ref_block_bytes</label>
+            <input id="refBlockBytes" placeholder="block number &amp; 0xffff" />
+            <p class="hint">4 hex chars. Low 2 bytes of a recent block number.</p>
+          </div>
+          <div class="field">
+            <label for="refBlockHash">ref_block_hash</label>
+            <input id="refBlockHash" placeholder="8 bytes of the reference block id" />
+            <p class="hint">16 hex chars, from the same recent block.</p>
+          </div>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label for="expiration">expiration (ms)</label>
+            <input id="expiration" placeholder="now + 60s" />
+            <p class="hint">Empty = now + 60 seconds.</p>
+          </div>
+          <div class="field">
+            <label for="timestamp">timestamp (ms)</label>
+            <input id="timestamp" placeholder="now" />
+            <p class="hint">Empty = now.</p>
+          </div>
+        </div>
+        <p id="blockStatus" class="hint"></p>
+      </div>
+
+      <div class="group">
+        <h3>USDT / TRC-20 — optional</h3>
+        <div class="row">
+          <div class="field token-field">
+            <div class="label-row">
+              <label for="contract">contract <span class="token-only">(TRC-20 only)</span></label>
+              <button type="button" class="secondary mini" id="btnUseUsdt">Use USDT</button>
+            </div>
+            <input id="contract" placeholder="TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t" />
+            <p class="hint">
+              Empty = native TRX (<code>TransferContract</code>). Filled = TRC-20 <code>transfer</code>
+              (<code>TriggerSmartContract</code>).
+            </p>
+          </div>
+          <div class="field token-field">
+            <label for="feeLimit">fee_limit (sun) <span class="token-only">(TRC-20 only)</span></label>
+            <input id="feeLimit" value="100000000" />
+            <p class="hint">Maximum TRX the network may burn for energy. Ignored when contract is empty.</p>
+          </div>
+        </div>
+      </div>
+
       <div class="actions">
         <button type="button" id="btnSign">Sign Collect item</button>
         <button type="button" class="secondary" id="btnCollect">Build CollectRequest JSON</button>
@@ -197,6 +285,8 @@
     const TRANSFER_TYPE_URL = "type.googleapis.com/protocol.TransferContract";
     const TRIGGER_TYPE_URL = "type.googleapis.com/protocol.TriggerSmartContract";
     const ZERO_ADDRESS = "T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb";
+    const USDT_CONTRACT = "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t";
+    const TRONGRID_URL = "https://api.trongrid.io/wallet/getnowblock";
 
     const $ = (id) => document.getElementById(id);
     const statusEl = (id, text, cls) => {
@@ -209,6 +299,55 @@
     };
 
     let lastJson = "";
+
+    const assetLabel = () => ($("contract").value.trim() ? "USDT (TRC-20)" : "native TRX");
+
+    $("btnUseUsdt").onclick = () => {
+      $("contract").value = USDT_CONTRACT;
+    };
+
+    const fetchLatestBlock = async () => {
+      const button = $("btnFetchBlock");
+      button.disabled = true;
+      statusEl("blockStatus", "Fetching latest block from TronGrid…", "warn");
+      try {
+        const response = await fetch(TRONGRID_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: "{}",
+          cache: "no-store",
+          signal: AbortSignal.timeout(10_000),
+        });
+        if (!response.ok) throw new Error("HTTP " + response.status);
+        const block = await response.json();
+        const raw = block && block.block_header && block.block_header.raw_data;
+        const number = raw && raw.number;
+        const blockID = block && block.blockID;
+        if (
+          !Number.isSafeInteger(number) ||
+          typeof blockID !== "string" ||
+          !/^[0-9a-fA-F]{64}$/.test(blockID)
+        ) {
+          throw new Error("unexpected response");
+        }
+        const blockTime = Number.isSafeInteger(raw.timestamp) ? raw.timestamp : Date.now();
+        $("refBlockBytes").value = (number % 0x10000).toString(16).padStart(4, "0");
+        $("refBlockHash").value = blockID.slice(16, 32).toLowerCase();
+        $("timestamp").value = String(blockTime);
+        $("expiration").value = String(blockTime + 60_000);
+        statusEl(
+          "blockStatus",
+          "Filled from block #" + number + ". Re-fetch right before broadcasting.",
+          "ok",
+        );
+      } catch (error) {
+        statusEl("blockStatus", "Could not fetch the block: " + error.message, "err");
+      } finally {
+        button.disabled = false;
+      }
+    };
+
+    $("btnFetchBlock").onclick = fetchLatestBlock;
 
     const hexToBytes = (hex) => {
       const h = String(hex).replace(/^0x/i, "");
@@ -538,7 +677,7 @@
         typeUrl = TRIGGER_TYPE_URL;
         feeLimit = BigInt($("feeLimit").value.trim() || "100000000");
         if (feeLimit <= 0n || feeLimit > BigInt(Number.MAX_SAFE_INTEGER)) {
-          throw new Error("fee_limit must be a positive safe integer.");
+          throw new Error("fee_limit must be a positive integer in sun (required for USDT/TRC-20).");
         }
         value = {
           owner_address: addressHex(from),
@@ -604,8 +743,14 @@
         const item = await buildItem();
         lastJson = JSON.stringify(item, null, 2);
         $("signOut").textContent = lastJson;
-        statusEl("signStatus", "Signed in-browser. Ready for Collect.", "ok");
+        statusEl(
+          "signStatus",
+          "Signed " + assetLabel() + " in-browser. Ready for Collect.",
+          "ok",
+        );
       } catch (error) {
+        lastJson = "";
+        $("signOut").textContent = "";
         statusEl("signStatus", error.message, "err");
       }
     };
@@ -616,8 +761,15 @@
         const request = { items: [item] };
         lastJson = JSON.stringify(request, null, 2);
         $("signOut").textContent = lastJson;
-        statusEl("signStatus", "CollectRequest JSON. Send via Postman/grpcurl — browser cannot speak native gRPC.", "warn");
+        statusEl(
+          "signStatus",
+          "CollectRequest JSON for " + assetLabel() +
+            ". Send via Postman/grpcurl — browser cannot speak native gRPC.",
+          "warn",
+        );
       } catch (error) {
+        lastJson = "";
+        $("signOut").textContent = "";
         statusEl("signStatus", error.message, "err");
       }
     };
