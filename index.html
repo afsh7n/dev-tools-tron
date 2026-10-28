@@ -3,786 +3,2920 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Dev tools — Tron address, scan, sign TRX/USDT</title>
-  <meta
-    name="description"
-    content="Local Tron dev tool: generate an address, build a scan watch-list payload, and sign TRX or USDT Collect transactions."
-  />
+  <meta name="color-scheme" content="dark" />
+  <meta name="description" content="Build, hash and sign Tron transactions locally with protobuf, then copy the Collect JSON." />
+  <title>TRX Dev Tools — build · hash · sign</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%2358a6ff' d='M3 5h18l-7 8.4V21l-4-2.6v-5L3 5Z'/%3E%3C/svg%3E" />
   <script src="https://cdn.jsdelivr.net/npm/ethers@6.15.0/dist/ethers.umd.min.js"></script>
   <style>
     :root {
-      --bg: #0f1419;
-      --panel: #1a222c;
-      --line: #2a3644;
-      --text: #e8eef4;
-      --muted: #8b9aab;
-      --accent: #3d9cf0;
-      --ok: #3ecf8e;
-      --err: #f07178;
-      --warn: #e6c07b;
+      --bg: #070b10;
+      --panel: #101821;
+      --panel-2: #131d28;
+      --line: #223040;
+      --line-soft: #1a2531;
+      --text: #e7eef6;
+      --muted: #8fa0b3;
+      --dim: #647a8f;
+      --accent: #58a6ff;
+      --accent-2: #8b5cf6;
+      --ok: #4ade80;
+      --err: #fb7185;
+      --warn: #fbbf24;
+      --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+      --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     }
-    * { box-sizing: border-box; }
+    *, *::before, *::after { box-sizing: border-box; }
+    html { color-scheme: dark; }
+    [hidden] { display: none !important; }
     body {
       margin: 0;
-      font: 14px/1.45 ui-sans-serif, system-ui, sans-serif;
-      background: var(--bg);
+      min-height: 100vh;
+      font: 14px/1.5 var(--sans);
       color: var(--text);
+      background:
+        radial-gradient(1100px 520px at 8% -8%, rgba(88,166,255,.13), transparent 62%),
+        radial-gradient(900px 480px at 100% 0%, rgba(139,92,246,.11), transparent 60%),
+        var(--bg);
+      background-attachment: fixed;
+      -webkit-font-smoothing: antialiased;
     }
-    header {
-      padding: 20px 24px 8px;
-      border-bottom: 1px solid var(--line);
+    code { font-family: var(--mono); }
+    .mono { font-family: var(--mono); }
+
+    /* ---------- top bar ---------- */
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: rgba(7,11,16,.78);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--line-soft);
     }
-    header h1 { margin: 0 0 6px; font-size: 18px; font-weight: 650; }
-    header p { margin: 0; color: var(--muted); max-width: 72ch; }
-    main {
-      display: grid;
+    .topbar-inner {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 13px 24px 9px;
+      display: flex;
+      align-items: center;
       gap: 16px;
-      padding: 16px 24px 32px;
-      max-width: 1100px;
     }
-    @media (min-width: 900px) {
-      main { grid-template-columns: 1fr 1fr; }
-      .wide { grid-column: 1 / -1; }
-    }
-    section {
-      background: var(--panel);
-      border: 1px solid var(--line);
+    .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .logo {
+      width: 38px; height: 38px; flex: none;
+      display: grid; place-items: center;
       border-radius: 12px;
-      padding: 16px;
+      color: #cfe6ff;
+      background: linear-gradient(145deg, rgba(88,166,255,.22), rgba(139,92,246,.18));
+      border: 1px solid rgba(88,166,255,.3);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 8px 24px -12px rgba(88,166,255,.7);
     }
-    h2 { margin: 0 0 12px; font-size: 15px; }
-    label { display: block; color: var(--muted); font-size: 12px; margin: 10px 0 4px; }
+    .logo svg { width: 22px; height: 22px; }
+    h1 { margin: 0; font-size: 16px; letter-spacing: -.01em; }
+    .brand-sub { margin: 2px 0 0; color: var(--muted); font-size: 12px; }
+    .topbar-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+    .local-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 6px 9px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255,255,255,.025);
+      color: #9fb6cf;
+      font-size: 10.5px; font-weight: 600;
+      letter-spacing: .08em; text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .local-badge svg { width: 11px; height: 11px; }
+    .wallet-pill {
+      position: relative;
+      display: flex; flex-direction: column; align-items: flex-start; gap: 1px;
+      min-width: 152px;
+      padding: 7px 12px 7px 28px;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      color: var(--text);
+      font: inherit;
+      text-align: left;
+      cursor: pointer;
+      transition: border-color .15s, background .15s;
+    }
+    .wallet-pill:hover { border-color: #33475d; background: #121c26; }
+    .wallet-pill .dot {
+      position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--dim);
+      box-shadow: 0 0 0 3px rgba(255,255,255,.03);
+    }
+    .wallet-pill.has-wallet .dot { background: var(--ok); box-shadow: 0 0 10px rgba(74,222,128,.6); }
+    .pill-meta { font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--dim); }
+    .pill-value { font: 11.5px var(--mono); color: #cfe0f2; }
+    .tabs-wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px 11px; }
+    .tabs {
+      display: inline-flex; gap: 4px;
+      padding: 4px;
+      border: 1px solid var(--line-soft);
+      border-radius: 11px;
+      background: rgba(11,17,24,.7);
+    }
+    .tab {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 8px 14px;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--muted);
+      font: 600 12.5px var(--sans);
+      cursor: pointer;
+      transition: color .15s, background .15s, border-color .15s, box-shadow .15s;
+      white-space: nowrap;
+    }
+    .tab svg { width: 15px; height: 15px; opacity: .85; }
+    .tab:hover { color: var(--text); background: rgba(255,255,255,.035); }
+    .tab.active {
+      color: #eaf5ff;
+      background: linear-gradient(180deg, rgba(88,166,255,.18), rgba(88,166,255,.08));
+      border-color: rgba(88,166,255,.3);
+      box-shadow: 0 8px 24px -16px rgba(88,166,255,.9);
+    }
+    .tab-badge {
+      margin-left: 2px;
+      padding: 2px 6px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.07);
+      color: var(--muted);
+      font: 600 10px var(--sans);
+    }
+    .tab-badge.ok { background: rgba(74,222,128,.14); color: var(--ok); }
+
+    /* ---------- layout ---------- */
+    main { max-width: 1120px; margin: 0 auto; padding: 26px 24px 70px; }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; animation: rise .28s ease both; }
+    @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+    .panel {
+      padding: 22px 24px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: linear-gradient(180deg, rgba(19,29,40,.86), rgba(12,18,26,.92));
+      box-shadow: 0 30px 70px -40px #000;
+    }
+    .section-head {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      gap: 16px; flex-wrap: wrap;
+      margin-bottom: 18px;
+    }
+    .eyebrow {
+      margin-bottom: 5px;
+      color: #6f8ba6;
+      font-size: 10.5px; font-weight: 700;
+      letter-spacing: .16em; text-transform: uppercase;
+    }
+    h2 { margin: 0; font-size: 19px; letter-spacing: -.015em; }
+    .section-head p { margin: 6px 0 0; max-width: 72ch; color: var(--muted); font-size: 12.5px; }
+    .section-head p code { color: #a9c6e2; font-size: 11.5px; }
+    .panel-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
+      gap: 24px;
+    }
+    .stack > .field + .field { margin-top: 13px; }
+    .aside { border-left: 1px solid var(--line-soft); padding-left: 24px; }
+    .aside h3 {
+      margin: 0 0 11px;
+      color: #9db0c4;
+      font-size: 11.5px; font-weight: 700;
+      letter-spacing: .08em; text-transform: uppercase;
+    }
+    .bullets { margin: 0; padding-left: 16px; display: grid; gap: 9px; color: var(--muted); font-size: 11.5px; }
+    .bullets strong { color: #cfdded; font-weight: 600; }
+    .bullets code { color: #b9d3e8; }
+    .aside-note { margin: 14px 0 0; color: var(--dim); font-size: 11px; line-height: 1.65; }
+    .aside-note code { color: #a9c6e2; }
+    .side-flow { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line-soft); }
+    .side-flow-label { display: block; margin-bottom: 8px; color: var(--dim); font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase; }
+    .mini-pipeline { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+    .mini-pipeline span {
+      padding: 3px 7px;
+      border: 1px solid var(--line-soft);
+      border-radius: 5px;
+      background: rgba(255,255,255,.025);
+      color: #a9c6e2;
+      font: 500 10px var(--mono);
+    }
+    .mini-pipeline i { color: #3f5468; font-style: normal; font-size: 11px; }
+
+    /* ---------- form ---------- */
+    .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 16px; }
+    .field { min-width: 0; }
+    .field.span-2 { grid-column: 1 / -1; }
+    .field label {
+      display: flex; align-items: center; gap: 8px;
+      margin-bottom: 6px;
+      color: #9db0c4;
+      font-size: 11.5px; font-weight: 600;
+    }
+    .req { color: var(--err); }
+    .unit {
+      padding: 1px 5px;
+      border: 1px solid var(--line-soft);
+      border-radius: 4px;
+      color: var(--dim);
+      font: 500 10px var(--mono);
+    }
+    .group-head-row {
+      grid-column: 1 / -1;
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      margin-top: 6px;
+      padding-top: 14px;
+      border-top: 1px dashed var(--line-soft);
+    }
+    .group-head-row > span {
+      color: #9db0c4;
+      font-size: 10.5px; font-weight: 700;
+      letter-spacing: .1em; text-transform: uppercase;
+    }
     input, textarea, select {
       width: 100%;
-      background: #0f1419;
-      color: var(--text);
+      padding: 10px 12px;
       border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 8px 10px;
-      font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+      border-radius: 9px;
+      outline: none;
+      background: #080e14;
+      color: var(--text);
+      font: 13px/1.45 var(--mono);
+      transition: border-color .15s, box-shadow .15s, background .15s;
     }
-    textarea { min-height: 120px; resize: vertical; }
-    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-    button {
-      background: var(--accent);
-      color: #061018;
+    input::placeholder, textarea::placeholder { color: #4d6074; }
+    input:focus, textarea:focus {
+      border-color: rgba(88,166,255,.6);
+      background: #0a1119;
+      box-shadow: 0 0 0 3px rgba(88,166,255,.1);
+    }
+    input[readonly] { color: #b9cbdd; }
+    .paste-area { min-height: 132px; resize: vertical; line-height: 1.55; }
+    .key { transition: filter .18s; }
+    .key:not(:placeholder-shown) { filter: blur(4.5px); }
+    .key:not(:placeholder-shown).show { filter: none; }
+    .input-row { display: flex; align-items: center; gap: 8px; }
+    .input-row input { flex: 1; min-width: 0; }
+    .field-hint { margin: 5px 0 0; color: var(--dim); font-size: 11px; }
+    .field-hint code { color: #a9c6e2; }
+    .field-err { display: none; margin: 5px 0 0; color: var(--err); font-size: 11px; }
+    .field.is-invalid .field-err { display: block; }
+    .field.is-invalid .field-hint { display: none; }
+    .field.is-invalid input, .field.is-invalid textarea {
+      border-color: rgba(251,113,133,.55);
+      box-shadow: 0 0 0 3px rgba(251,113,133,.09);
+    }
+    .form-actions, .actions-row {
+      display: flex; align-items: center; flex-wrap: wrap;
+      gap: 10px 14px;
+    }
+    .form-actions {
+      margin-top: 18px;
+      padding-top: 16px;
+      border-top: 1px dashed var(--line-soft);
+    }
+    .actions-row { margin-top: 16px; }
+    .form-note { color: var(--dim); font-size: 11px; }
+
+    /* ---------- buttons ---------- */
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+      padding: 9px 14px;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      background: #16222e;
+      color: var(--text);
+      font: 600 12.5px var(--sans);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: border-color .15s, background .15s, filter .15s, opacity .15s;
+    }
+    .btn:hover:not(:disabled) { border-color: #38506a; background: #1a2836; }
+    .btn:disabled { opacity: .45; cursor: not-allowed; }
+    .btn.primary {
+      border-color: transparent;
+      background: linear-gradient(135deg, #4c9cf5, #6f7cf7);
+      color: #06111f;
+      box-shadow: 0 10px 26px -14px rgba(88,166,255,.9), inset 0 1px 0 rgba(255,255,255,.22);
+    }
+    .btn.primary:hover:not(:disabled) { filter: brightness(1.06); }
+    .btn.ghost { background: transparent; color: var(--muted); }
+    .btn.tiny { padding: 5px 9px; border-radius: 6px; font-size: 10.5px; }
+    .btn.copied {
+      border-color: rgba(74,222,128,.4);
+      background: rgba(74,222,128,.08);
+      color: var(--ok);
+    }
+    .btn.is-busy { pointer-events: none; }
+    .spinner {
+      width: 13px; height: 13px;
+      border: 2px solid currentColor;
+      border-right-color: transparent;
+      border-radius: 50%;
+      animation: spin .65s linear infinite;
+      opacity: .9;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .chip {
+      padding: 2px 7px;
+      border: 1px solid var(--line-soft);
+      border-radius: 999px;
+      background: rgba(255,255,255,.03);
+      color: #9fb4c9;
+      font: 500 10px var(--mono);
+      white-space: nowrap;
+    }
+
+    /* ---------- collect header ---------- */
+    .pipeline {
+      display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+      margin: 0 0 4px;
+      padding: 9px 11px;
+      border: 1px solid var(--line-soft);
+      border-radius: 10px;
+      background: rgba(8,13,19,.55);
+    }
+    .pipe { padding: 2px 6px; color: #9fb4c9; font: 500 10.5px var(--mono); }
+    .pipe code { color: #bcd9f6; }
+    .pipe-arrow { color: #3f5468; font-size: 11px; }
+    .stepper { position: relative; margin: 18px 0 4px; padding-top: 4px; }
+    .stepper-track {
+      position: absolute; top: 18px; left: 12.5%; right: 12.5%;
+      height: 2px;
+      border-radius: 2px;
+      background: var(--line);
+    }
+    .stepper-fill {
+      width: 0; height: 100%;
+      border-radius: 2px;
+      background: linear-gradient(90deg, #58a6ff, #4ade80);
+      transition: width .45s cubic-bezier(.2,.8,.2,1);
+    }
+    .stepper-steps { position: relative; display: grid; grid-template-columns: repeat(4, 1fr); }
+    .stepper-step {
+      display: flex; flex-direction: column; align-items: center; gap: 6px;
+      padding: 0;
       border: 0;
-      border-radius: 8px;
-      padding: 8px 12px;
-      font-weight: 650;
+      background: none;
+      color: var(--dim);
+      font: 600 10.5px var(--sans);
       cursor: pointer;
     }
-    button.secondary { background: #2a3644; color: var(--text); }
-    button:disabled { opacity: 0.5; cursor: not-allowed; }
-    .hint { color: var(--muted); font-size: 12px; margin-top: 8px; }
-    .field .hint { margin-top: 4px; font-size: 11px; }
-    .group { border-top: 1px solid var(--line); margin-top: 18px; padding-top: 2px; }
-    .group h3 {
-      margin: 14px 0 0;
-      font-size: 11px;
-      font-weight: 650;
-      letter-spacing: 0.06em;
+    .stepper-step:disabled { cursor: not-allowed; opacity: .55; }
+    .node-dot {
+      width: 30px; height: 30px;
+      display: grid; place-items: center;
+      border: 1px solid var(--line);
+      border-radius: 50%;
+      background: #0b1219;
+      color: var(--muted);
+      font: 700 11px var(--sans);
+      transition: border-color .2s, color .2s, background .2s, box-shadow .2s;
+    }
+    .stepper-step:not(:disabled):hover .node-dot { border-color: rgba(88,166,255,.5); }
+    .stepper-step.current .node-dot {
+      border-color: rgba(88,166,255,.65);
+      color: #dff0ff;
+      box-shadow: 0 0 0 4px rgba(88,166,255,.08), 0 0 22px -6px rgba(88,166,255,.6);
+    }
+    .stepper-step.done .node-dot {
+      border-color: rgba(74,222,128,.5);
+      background: rgba(74,222,128,.14);
+      color: var(--ok);
+    }
+    .stepper-step.current .node-label { color: #cfe6fb; }
+    .stepper-step.done .node-label { color: #9fd9b8; }
+    .node-label { letter-spacing: .02em; }
+
+    /* ---------- step cards ---------- */
+    .step-card {
+      position: relative;
+      margin-top: 14px;
+      padding: 18px 20px 20px;
+      border: 1px solid var(--line);
+      border-radius: 15px;
+      background: linear-gradient(180deg, rgba(16,25,35,.9), rgba(10,16,23,.92));
+      scroll-margin-top: 132px;
+      transition: border-color .2s, box-shadow .2s, opacity .2s;
+    }
+    .step-card.is-locked { opacity: .55; }
+    .step-card.is-current {
+      border-color: rgba(88,166,255,.32);
+      box-shadow: 0 0 0 1px rgba(88,166,255,.06), 0 22px 50px -36px rgba(88,166,255,.55);
+    }
+    .step-card.is-done { border-color: rgba(74,222,128,.22); }
+    .step-head { display: flex; align-items: flex-start; gap: 12px; }
+    .step-number {
+      flex: none;
+      width: 30px; height: 30px;
+      display: grid; place-items: center;
+      border: 1px solid rgba(88,166,255,.22);
+      border-radius: 9px;
+      background: rgba(88,166,255,.1);
+      color: #a9c9ea;
+      font: 700 12px var(--sans);
+    }
+    .step-card.is-done .step-number {
+      border-color: var(--ok);
+      background: var(--ok);
+      color: #0a1710;
+    }
+    .step-card.is-locked .step-number {
+      border-color: var(--line);
+      background: rgba(255,255,255,.03);
+      color: var(--dim);
+    }
+    .step-titles { flex: 1; min-width: 0; }
+    .step-titles h3 { margin: 0; font-size: 14.5px; letter-spacing: -.01em; }
+    .step-titles p { margin: 3px 0 0; color: var(--muted); font-size: 11.5px; }
+    .pill {
+      flex: none;
+      display: inline-flex; align-items: center;
+      padding: 4px 8px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255,255,255,.02);
+      color: var(--muted);
+      font: 600 10px var(--sans);
+      letter-spacing: .04em;
       text-transform: uppercase;
-      color: var(--muted);
     }
-    .group-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 14px; }
-    .group-head h3 { margin: 0; }
-    .label-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 10px 0 4px; }
-    .label-row label { margin: 0; }
-    .token-only { color: var(--err); }
-    .token-field input { border-color: rgba(240, 113, 120, 0.45); }
-    button.mini {
-      padding: 3px 8px;
-      font-size: 11px;
-      font-weight: 600;
-      line-height: 1.3;
-      border-radius: 6px;
-      white-space: nowrap;
-      flex-shrink: 0;
+    .pill.ready { border-color: rgba(88,166,255,.28); background: rgba(88,166,255,.08); color: #a8d4ff; }
+    .pill.done { border-color: rgba(74,222,128,.28); background: rgba(74,222,128,.07); color: var(--ok); }
+    .pill.locked { color: var(--dim); }
+    .step-body { margin-top: 16px; }
+    .lock-note {
+      display: flex; align-items: center; gap: 8px;
+      margin-top: 14px;
+      padding: 10px 12px;
+      border: 1px dashed var(--line);
+      border-radius: 9px;
+      color: var(--dim);
+      font-size: 11.5px;
     }
-    button.small { padding: 6px 10px; font-size: 12px; }
-    .note {
-      margin: 10px 0 0;
-      padding: 8px 10px;
-      background: #0f1419;
+    .lock-note::before { content: "◇"; color: #4e667c; font-size: 12px; }
+
+    /* ---------- results ---------- */
+    .result { margin-top: 16px; animation: reveal .24s ease both; }
+    @keyframes reveal { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+    .facts {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .fact {
+      padding: 9px 11px;
+      border: 1px solid var(--line-soft);
+      border-radius: 10px;
+      background: #0b1219;
+    }
+    .fact span { display: block; color: var(--dim); font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; }
+    .fact strong { display: block; margin-top: 3px; color: #d9e7f5; font: 500 12px var(--mono); }
+    .fact strong.muted { color: var(--muted); }
+    .callout {
+      margin: 0 0 12px;
+      padding: 9px 12px;
+      border-left: 2px solid rgba(88,166,255,.5);
+      border-radius: 0 8px 8px 0;
+      background: rgba(88,166,255,.05);
+      color: #a9c6e2;
+      font-size: 11.5px;
+      line-height: 1.6;
+    }
+    .code-card {
+      overflow: hidden;
       border: 1px solid var(--line);
-      border-left: 3px solid var(--accent);
-      border-radius: 8px;
-      color: var(--muted);
-      font-size: 12px;
+      border-radius: 11px;
+      background: #080d13;
     }
-    .note strong { color: var(--text); }
-    .ok { color: var(--ok); }
-    .err { color: var(--err); }
-    .warn { color: var(--warn); }
-    .key { filter: blur(5px); }
-    .key.show { filter: none; }
-    pre {
-      margin: 10px 0 0;
-      background: #0f1419;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 10px;
+    .code-card + .code-card { margin-top: 12px; }
+    .code-head {
+      display: flex; align-items: center; justify-content: space-between; gap: 8px 12px;
+      flex-wrap: wrap;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--line-soft);
+      background: rgba(255,255,255,.018);
+    }
+    .code-title { display: flex; align-items: center; gap: 8px; color: #b9c9da; font-size: 11.5px; font-weight: 600; }
+    .badge {
+      padding: 1px 5px;
+      border: 1px solid var(--line-soft);
+      border-radius: 4px;
+      background: rgba(255,255,255,.05);
+      color: var(--muted);
+      font: 500 9.5px var(--mono);
+    }
+    .code-tools { display: flex; align-items: center; gap: 8px; }
+    pre.code {
+      margin: 0;
+      padding: 12px 13px;
+      max-height: 320px;
       overflow: auto;
-      font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+      color: #cfe2f3;
+      font: 11.5px/1.6 var(--mono);
       white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+    pre.code:empty::before { content: attr(data-empty); color: var(--dim); }
+    .result-note { margin: 11px 0 0; color: var(--dim); font-size: 11px; line-height: 1.65; }
+    .result-note code { color: #a9c6e2; }
+    .hash-feature {
+      position: relative;
+      overflow: hidden;
+      margin-bottom: 12px;
+      padding: 14px 16px;
+      border: 1px solid rgba(88,166,255,.28);
+      border-radius: 12px;
+      background: linear-gradient(160deg, rgba(88,166,255,.1), rgba(139,92,246,.06));
+    }
+    .hash-feature::after {
+      content: "";
+      position: absolute; right: -40px; bottom: -60px;
+      width: 160px; height: 160px;
+      background: radial-gradient(circle, rgba(88,166,255,.2), transparent 70%);
+      pointer-events: none;
+    }
+    .hash-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .hash-key { color: #8fb6dd; font-size: 10px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
+    .hash-value {
+      display: block;
+      margin-top: 8px;
+      color: #eaf6ff;
+      font: 13px/1.6 var(--mono);
       word-break: break-all;
+    }
+    .hash-note { display: block; margin-top: 8px; color: #7f9ab3; font-size: 10.5px; }
+    .sign-bar {
+      display: flex; align-items: center; flex-wrap: wrap;
+      gap: 10px 24px;
+      margin-bottom: 14px;
+      padding: 10px 12px;
+      border: 1px solid var(--line-soft);
+      border-radius: 9px;
+      background: rgba(8,13,19,.5);
+    }
+    .sign-ctx { display: flex; flex-direction: column; gap: 2px; }
+    .mini-label { color: var(--dim); font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; }
+    .sign-ctx code { color: #c6d9ec; font: 11.5px var(--mono); }
+    .sign-ctx code.empty { color: var(--warn); }
+    .verify, .export-banner {
+      display: flex; align-items: flex-start; gap: 10px;
+      margin-bottom: 12px;
+      padding: 12px 14px;
+      border: 1px solid rgba(74,222,128,.3);
+      border-radius: 10px;
+      background: rgba(74,222,128,.07);
+    }
+    .verify svg, .export-banner svg { flex: none; width: 18px; height: 18px; margin-top: 1px; color: var(--ok); }
+    .verify strong, .export-banner strong { display: block; color: #c7f7d9; font-size: 12px; }
+    .verify span, .export-banner span { color: #8fbfa5; font: 11px var(--mono); word-break: break-all; }
+    .export-banner span { font-family: var(--sans); font-size: 11.5px; }
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+    .two-col .code-card + .code-card { margin-top: 0; }
+    .endpoint {
+      display: grid; gap: 8px;
+      margin-top: 12px;
+      padding: 11px 13px;
+      border: 1px solid var(--line-soft);
+      border-radius: 10px;
+      background: rgba(8,13,19,.5);
+    }
+    .endpoint div { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+    .endpoint span { min-width: 62px; color: var(--dim); font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; }
+    .endpoint code { color: #b9d3e8; font: 11px var(--mono); word-break: break-all; }
+    .alert {
+      display: flex; align-items: flex-start; gap: 10px;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      background: rgba(255,255,255,.025);
+      color: var(--muted);
+      font-size: 11.5px;
+    }
+    .alert.info { border-color: rgba(88,166,255,.25); background: rgba(88,166,255,.05); color: #a9c6e2; }
+    .alert.warn { border-color: rgba(251,191,36,.28); background: rgba(251,191,36,.06); color: #e8c98f; }
+    .alert.err { border-color: rgba(251,113,133,.3); background: rgba(251,113,133,.07); color: #f3a6af; }
+    .alert svg { flex: none; width: 16px; height: 16px; margin-top: 1px; }
+    .alert-body { flex: 1; min-width: 0; }
+    .alert-body strong { display: block; font-size: 12px; }
+    .alert-body span { color: var(--muted); font-size: 11px; }
+    .alert .btn { margin-left: auto; }
+    #buildError { margin-top: 12px; }
+    .kv { display: flex; flex-direction: column; gap: 2px; padding: 9px 0; border-bottom: 1px solid var(--line-soft); }
+    .kv:last-child { border-bottom: 0; }
+    .kv span { color: var(--dim); font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; }
+    .kv code { color: #bcd3e8; font: 11px var(--mono); word-break: break-all; }
+    .status-line { min-height: 18px; margin: 12px 0 0; color: var(--muted); font-size: 11px; }
+    .status-line.ok { color: var(--ok); }
+    .status-line.err { color: var(--err); }
+    .status-line.warn { color: var(--warn); }
+
+    /* ---------- toasts & footer ---------- */
+    .toasts {
+      position: fixed; right: 18px; bottom: 18px;
+      z-index: 100;
+      display: flex; flex-direction: column; gap: 8px;
+      max-width: min(380px, calc(100vw - 36px));
+    }
+    .toast {
+      display: flex; align-items: flex-start; gap: 9px;
+      padding: 10px 13px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #111b25;
+      color: #d7e4f1;
+      font-size: 12px;
+      box-shadow: 0 18px 40px -20px rgba(0,0,0,.9);
+      animation: toast-in .22s ease both;
+    }
+    .toast::before {
+      content: ""; flex: none;
+      width: 7px; height: 7px; margin-top: 5px;
+      border-radius: 50%;
+      background: var(--accent);
+    }
+    .toast.success::before { background: var(--ok); }
+    .toast.error::before { background: var(--err); }
+    .toast.warn::before { background: var(--warn); }
+    .toast.out { animation: toast-out .2s ease both; }
+    @keyframes toast-in { from { opacity: 0; transform: translateY(8px) scale(.98); } }
+    @keyframes toast-out { to { opacity: 0; transform: translateY(6px); } }
+    footer {
+      display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px;
+      max-width: 1120px; margin: 0 auto;
+      padding: 0 24px 40px;
+      color: var(--dim);
+      font-size: 11px;
+    }
+    .fatal {
+      padding: 13px 20px;
+      border-bottom: 1px solid rgba(251,113,133,.4);
+      background: rgba(251,113,133,.12);
+      color: #ffc3c9;
+      font-size: 13px;
+    }
+    :focus-visible { outline: 2px solid rgba(88,166,255,.7); outline-offset: 2px; }
+    input:focus-visible { outline: none; }
+
+    @media (max-width: 860px) {
+      .panel-grid { grid-template-columns: 1fr; }
+      .aside { border-left: 0; border-top: 1px solid var(--line-soft); padding-left: 0; padding-top: 18px; }
+    }
+    @media (max-width: 720px) {
+      .form-grid { grid-template-columns: 1fr; }
+      .field.span-2 { grid-column: auto; }
+      .two-col { grid-template-columns: 1fr; }
+      .topbar-inner { flex-wrap: wrap; padding: 12px 16px 8px; }
+      .topbar-right { width: 100%; justify-content: space-between; }
+      .wallet-pill { flex: 1; min-width: 0; }
+      .tabs-wrap { padding: 0 16px 10px; }
+      .tabs { display: flex; width: 100%; overflow-x: auto; }
+      .tab { flex: 1; justify-content: center; padding: 8px 10px; font-size: 11.5px; }
+      main { padding: 18px 16px 50px; }
+      .panel { padding: 18px 16px; border-radius: 14px; }
+      .brand-sub { display: none; }
+      .step-card { padding: 16px; scroll-margin-top: 168px; }
+      .stepper { margin-top: 14px; }
+      .stepper-step { font-size: 9.5px; }
+      .node-dot { width: 26px; height: 26px; font-size: 10px; }
+      .stepper-track { top: 16px; }
+      .result-note { font-size: 10.5px; }
+      .facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .group-head-row { flex-wrap: wrap; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: .001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: .001ms !important;
+      }
     }
   </style>
 </head>
 <body>
-  <header>
-    <h1>Dev tools</h1>
-    <p>
-      One local HTML file. Address + sign run in the browser with <code>ethers</code> (CDN).
-      Native TRX and USDT (TRC-20) are both supported; fees are paid by burning TRX, so there are no
-      bandwidth or energy fields to fill. Native gRPC cannot run in a page, so Scan/Collect build the
-      exact proto JSON for Postman or grpcurl.
-    </p>
+  <noscript><div class="fatal">This tool needs JavaScript to build and sign transactions.</div></noscript>
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <div class="logo" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path d="M3.5 5.5h17l-6.6 7.9v5.7L10 16.6v-3.2l-6.5-7.9Z" fill="currentColor" opacity=".95"/>
+          </svg>
+        </div>
+        <div>
+          <h1>TRX Dev Tools</h1>
+          <p class="brand-sub">Build, hash and sign Tron transactions — 100% in this tab.</p>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <span class="local-badge">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <rect x="5" y="10.5" width="14" height="9" rx="2"/>
+            <path d="M8.5 10.5V7.8a3.5 3.5 0 0 1 7 0v2.7"/>
+          </svg>
+          Local only
+        </span>
+        <button type="button" class="wallet-pill" id="walletPill" title="Open wallet">
+          <span class="dot" aria-hidden="true"></span>
+          <span class="pill-meta">Signer</span>
+          <span class="pill-value" id="walletPillText">No wallet</span>
+        </button>
+      </div>
+    </div>
+    <div class="tabs-wrap">
+      <nav class="tabs" role="tablist" aria-label="Tools">
+        <button type="button" class="tab active" id="tab-wallet" role="tab" aria-selected="true" aria-controls="panel-wallet" data-tab="wallet">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+            <rect x="3" y="6" width="18" height="13" rx="2.5"/>
+            <path d="M15.5 12.5h2.6"/>
+            <path d="M3 9.5h18"/>
+          </svg>
+          Wallet
+        </button>
+        <button type="button" class="tab" id="tab-scan" role="tab" aria-selected="false" aria-controls="panel-scan" data-tab="scan" tabindex="-1">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+            <circle cx="11" cy="11" r="6"/>
+            <path d="m15.6 15.6 4.4 4.4"/>
+          </svg>
+          Scan
+        </button>
+        <button type="button" class="tab" id="tab-collect" role="tab" aria-selected="false" aria-controls="panel-collect" data-tab="collect" tabindex="-1">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+            <path d="M4 20h4.3L20 8.3 15.7 4 4 15.7V20Z"/>
+            <path d="m13.8 5.9 4.3 4.3"/>
+          </svg>
+          Collect &amp; sign
+          <span class="tab-badge" id="collectBadge">4 steps</span>
+        </button>
+        <button type="button" class="tab" id="tab-inspect" role="tab" aria-selected="false" aria-controls="panel-inspect" data-tab="inspect" tabindex="-1">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="m8.5 8-4 4 4 4"/>
+            <path d="m15.5 8 4 4-4 4"/>
+            <path d="m13.5 4.5-3 15"/>
+          </svg>
+          Inspect
+        </button>
+      </nav>
+    </div>
   </header>
+
   <main>
-    <section>
-      <h2>1. Address</h2>
-      <label>Address</label>
-      <input id="address" readonly placeholder="Generate or paste a key" />
-      <label>Private key</label>
-      <input id="privateKey" class="key" readonly placeholder="64 hex chars" />
-      <div class="actions">
-        <button type="button" id="btnGenerate">Generate</button>
-        <button type="button" class="secondary" id="btnToggleKey">Show key</button>
-        <button type="button" class="secondary" id="btnDownload">Download JSON</button>
-        <button type="button" class="secondary" id="btnLoad">Load JSON</button>
-        <input id="file" type="file" accept="application/json,.json" hidden />
-      </div>
-      <p class="hint warn">Key never leaves this tab. Do not commit wallet.json.</p>
-      <p id="walletStatus" class="hint"></p>
-    </section>
-
-    <section>
-      <h2>2. Scan (watch-list ADD)</h2>
-      <label>Address to watch</label>
-      <input id="scanAddress" placeholder="Uses generated address if empty" />
-      <div class="actions">
-        <button type="button" id="btnScan">Build BatchUpdateAddresses JSON</button>
-        <button type="button" class="secondary" id="btnCopyScan">Copy</button>
-      </div>
-      <p class="hint">gRPC: <code>tron_scanner.AddressService/BatchUpdateAddresses</code> + metadata <code>x-api-key</code></p>
-      <pre id="scanOut"></pre>
-    </section>
-
-    <section class="wide">
-      <h2>3. Sign Collect tx</h2>
-      <p class="hint">
-        One form for both assets: leave <code>contract</code> empty to sign native TRX, or fill it to sign
-        USDT/TRC-20. Fields marked in red are used only in the USDT/TRC-20 case.
-      </p>
-      <p class="note">
-        <strong>Fees:</strong> there are no bandwidth or energy fields. With no staked resources the network
-        burns TRX from the sender. For USDT/TRC-20, <code>fee_limit</code> is the maximum TRX that may be
-        burned for energy.
-      </p>
-
-      <div class="group">
-        <h3>Transfer — required for both</h3>
-        <div class="row">
-          <div class="field">
-            <label for="to">to_address</label>
-            <input id="to" placeholder="T… recipient" />
-            <p class="hint">Recipient address: Base58 <code>T…</code> or <code>41…</code> hex.</p>
-          </div>
-          <div class="field">
-            <label for="amount">amount</label>
-            <input id="amount" placeholder="1000000" />
-            <p class="hint">
-              Atomic units: TRX in sun (<code>1 TRX = 1000000</code>); USDT has 6 decimals
-              (<code>1 USDT = 1000000</code>).
-            </p>
+    <!-- ================= WALLET ================= -->
+    <section class="tab-panel active" id="panel-wallet" role="tabpanel" aria-labelledby="tab-wallet">
+      <div class="panel">
+        <div class="section-head">
+          <div>
+            <div class="eyebrow">Identity</div>
+            <h2>Wallet</h2>
+            <p>Generate a throwaway keypair or load wallet.json. Signing happens here, in memory, and the key never leaves the page.</p>
           </div>
         </div>
-      </div>
-
-      <div class="group">
-        <h3>Scanned item — required for both</h3>
-        <div class="row">
-          <div class="field">
-            <label for="transactionId">transaction_id</label>
-            <input id="transactionId" value="tx-1" />
-            <p class="hint">Scanner item id, not the on-chain txID.</p>
-          </div>
-          <div class="field">
-            <label for="tokenId">token_id</label>
-            <input id="tokenId" value="1" />
-            <p class="hint">Scanner catalog token id for TRX or USDT.</p>
-          </div>
-        </div>
-      </div>
-
-      <div class="group">
-        <div class="group-head">
-          <h3>Chain validity — required for both</h3>
-          <button type="button" class="secondary small" id="btnFetchBlock">Fetch latest block</button>
-        </div>
-        <div class="row">
-          <div class="field">
-            <label for="refBlockBytes">ref_block_bytes</label>
-            <input id="refBlockBytes" placeholder="block number &amp; 0xffff" />
-            <p class="hint">4 hex chars. Low 2 bytes of a recent block number.</p>
-          </div>
-          <div class="field">
-            <label for="refBlockHash">ref_block_hash</label>
-            <input id="refBlockHash" placeholder="8 bytes of the reference block id" />
-            <p class="hint">16 hex chars, from the same recent block.</p>
-          </div>
-        </div>
-        <div class="row">
-          <div class="field">
-            <label for="expiration">expiration (ms)</label>
-            <input id="expiration" placeholder="now + 60s" />
-            <p class="hint">Empty = now + 60 seconds.</p>
-          </div>
-          <div class="field">
-            <label for="timestamp">timestamp (ms)</label>
-            <input id="timestamp" placeholder="now" />
-            <p class="hint">Empty = now.</p>
-          </div>
-        </div>
-        <p id="blockStatus" class="hint"></p>
-      </div>
-
-      <div class="group">
-        <h3>USDT / TRC-20 — optional</h3>
-        <div class="row">
-          <div class="field token-field">
-            <div class="label-row">
-              <label for="contract">contract <span class="token-only">(TRC-20 only)</span></label>
-              <button type="button" class="secondary mini" id="btnUseUsdt">Use USDT</button>
+        <div class="panel-grid">
+          <div class="stack">
+            <div class="field">
+              <label for="address">Address</label>
+              <div class="input-row">
+                <input id="address" readonly placeholder="Generate or load a keypair" spellcheck="false" />
+                <button type="button" class="btn tiny" data-copy="address">Copy</button>
+              </div>
+              <p class="field-hint">Base58Check <code>T…</code> — internally <code>41</code> + 20 bytes, same secp256k1 curve as Ethereum.</p>
             </div>
-            <input id="contract" placeholder="TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t" />
-            <p class="hint">
-              Empty = native TRX (<code>TransferContract</code>). Filled = TRC-20 <code>transfer</code>
-              (<code>TriggerSmartContract</code>).
-            </p>
+            <div class="field">
+              <label for="privateKey">Private key</label>
+              <div class="input-row">
+                <input id="privateKey" class="key" readonly placeholder="64 hex chars" spellcheck="false" autocomplete="off" />
+                <button type="button" class="btn tiny" id="btnToggleKey" aria-pressed="false">Show</button>
+                <button type="button" class="btn tiny" data-copy="privateKey" data-sensitive>Copy</button>
+              </div>
+              <p class="field-hint">Blurred by default. Never share it and never commit it.</p>
+            </div>
+            <div class="actions-row">
+              <button type="button" class="btn primary" id="btnGenerate">Generate keypair</button>
+              <button type="button" class="btn" id="btnDownload">Download wallet.json</button>
+              <button type="button" class="btn ghost" id="btnLoad">Load wallet.json</button>
+              <input id="file" type="file" accept="application/json,.json" hidden />
+            </div>
+            <p id="walletStatus" class="status-line" role="status" aria-live="polite"></p>
           </div>
-          <div class="field token-field">
-            <label for="feeLimit">fee_limit (sun) <span class="token-only">(TRC-20 only)</span></label>
-            <input id="feeLimit" value="100000000" />
-            <p class="hint">Maximum TRX the network may burn for energy. Ignored when contract is empty.</p>
+          <aside class="aside">
+            <h3>Key safety</h3>
+            <ul class="bullets">
+              <li><strong>In-memory only.</strong> The key is held in this tab and is never uploaded or logged.</li>
+              <li><strong>Never commit it.</strong> wallet.json is a plain-text key — keep it out of git.</li>
+              <li><strong>Dev use only.</strong> Use throwaway keys, not a production wallet.</li>
+            </ul>
+            <div class="side-flow">
+              <span class="side-flow-label">Tron signing pipeline</span>
+              <div class="mini-pipeline">
+                <span>raw_data</span><i>→</i><span>protobuf</span><i>→</i><span>sha256</span><i>→</i><span>signature</span>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= SCAN ================= -->
+    <section class="tab-panel" id="panel-scan" role="tabpanel" aria-labelledby="tab-scan" hidden>
+      <div class="panel">
+        <div class="section-head">
+          <div>
+            <div class="eyebrow">Watch-list</div>
+            <h2>Scan address</h2>
+            <p>Build the exact JSON body for <code>BatchUpdateAddresses</code> and paste it into Postman or grpcurl.</p>
           </div>
+        </div>
+        <div class="panel-grid">
+          <div>
+            <div class="field" data-field="scanAddress">
+              <label for="scanAddress">Address to watch</label>
+              <div class="input-row">
+                <input id="scanAddress" placeholder="T… or 41… hex" spellcheck="false" />
+                <button type="button" class="btn tiny" id="btnUseWallet">Use wallet</button>
+              </div>
+              <p class="field-hint">Accepts Base58 <code>T…</code> or <code>41…</code> hex. Normalized to Base58.</p>
+              <p class="field-err" id="scanError"></p>
+            </div>
+            <div class="actions-row">
+              <button type="button" class="btn primary" id="btnScan">Build JSON</button>
+            </div>
+            <div class="code-card" style="margin-top: 16px;">
+              <div class="code-head">
+                <span class="code-title">BatchUpdateAddresses <span class="badge">body</span></span>
+                <div class="code-tools">
+                  <span class="chip">ADDRESS_OPERATION_ADD</span>
+                  <button type="button" class="btn tiny" id="btnCopyScan" data-copy="scanOut" disabled>Copy</button>
+                </div>
+              </div>
+              <pre class="code" id="scanOut" data-empty="Build the payload to see the JSON here."></pre>
+            </div>
+          </div>
+          <aside class="aside">
+            <h3>gRPC target</h3>
+            <div class="kv"><span>Service</span><code>tron_scanner.AddressService</code></div>
+            <div class="kv"><span>Method</span><code>BatchUpdateAddresses</code></div>
+            <div class="kv"><span>Operation</span><code>ADDRESS_OPERATION_ADD</code></div>
+            <p class="aside-note">Browsers cannot speak native gRPC, so this page builds the body only. Send it with Postman or grpcurl.</p>
+          </aside>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= COLLECT ================= -->
+    <section class="tab-panel" id="panel-collect" role="tabpanel" aria-labelledby="tab-collect" hidden>
+      <div class="section-head">
+        <div>
+          <div class="eyebrow">Collect · transaction flow</div>
+          <h2>Build → hash → sign → export</h2>
+          <p>Four explicit steps. Each one shows its output and lets you copy it, so you can see exactly what the private key signs.</p>
+        </div>
+        <button type="button" class="btn ghost" id="btnResetFlow">Reset flow</button>
+      </div>
+
+      <div class="pipeline" aria-label="Signing pipeline">
+        <span class="pipe">form values</span>
+        <span class="pipe-arrow">→</span>
+        <span class="pipe">raw_data</span>
+        <span class="pipe-arrow">→</span>
+        <span class="pipe"><code>protobuf</code></span>
+        <span class="pipe-arrow">→</span>
+        <span class="pipe"><code>sha256</code> txID</span>
+        <span class="pipe-arrow">→</span>
+        <span class="pipe">signature</span>
+        <span class="pipe-arrow">→</span>
+        <span class="pipe">signed_tx</span>
+      </div>
+
+      <div class="stepper" aria-label="Progress">
+        <div class="stepper-track"><div class="stepper-fill" id="stepperFill"></div></div>
+        <div class="stepper-steps">
+          <button type="button" class="stepper-step current" data-goto="1"><span class="node-dot">1</span><span class="node-label">Build</span></button>
+          <button type="button" class="stepper-step locked" data-goto="2" disabled><span class="node-dot">2</span><span class="node-label">Hash</span></button>
+          <button type="button" class="stepper-step locked" data-goto="3" disabled><span class="node-dot">3</span><span class="node-label">Sign</span></button>
+          <button type="button" class="stepper-step locked" data-goto="4" disabled><span class="node-dot">4</span><span class="node-label">Export</span></button>
         </div>
       </div>
 
-      <div class="actions">
-        <button type="button" id="btnSign">Sign Collect item</button>
-        <button type="button" class="secondary" id="btnCollect">Build CollectRequest JSON</button>
-        <button type="button" class="secondary" id="btnCopySign">Copy last JSON</button>
+      <!-- STEP 1 -->
+      <article class="step-card is-current" id="step-1">
+        <div class="step-head">
+          <span class="step-number" aria-hidden="true">1</span>
+          <div class="step-titles">
+            <h3>Build the raw_data object</h3>
+            <p>Turn the form into the unsigned Tron transaction object — native TRX or TRC-20.</p>
+          </div>
+          <span class="pill ready" id="status-1">Ready</span>
+        </div>
+        <div class="step-body">
+          <div class="alert info" style="margin-bottom: 14px;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+              <circle cx="12" cy="12" r="8.5"/>
+              <path d="M12 8v4.5M12 15.8v.2"/>
+            </svg>
+            <div class="alert-body">
+              <strong>Fees are paid by burning TRX</strong>
+              <span>No bandwidth or energy fields here. Native TRX burns bandwidth; TRC-20 burns energy and <code>fee_limit</code> caps that burn.</span>
+            </div>
+          </div>
+          <div class="alert warn" id="buildGate" style="margin-bottom: 14px;" hidden>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+              <rect x="4.5" y="10.5" width="15" height="9.5" rx="2"/>
+              <path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/>
+            </svg>
+            <div class="alert-body">
+              <strong>No wallet loaded</strong>
+              <span>The owner address lives inside raw_data, so building needs a keypair.</span>
+            </div>
+            <button type="button" class="btn tiny" id="btnOpenWallet">Open wallet</button>
+          </div>
+          <form id="txForm" novalidate autocomplete="off">
+            <div class="form-grid">
+              <div class="field span-2" data-field="to">
+                <label for="to">to_address <span class="req">*</span></label>
+                <input id="to" placeholder="T… recipient (Base58 or 41… hex)" spellcheck="false" />
+                <p class="field-err"></p>
+              </div>
+              <div class="field" data-field="amount">
+                <label for="amount">amount <span class="unit">atomic units</span></label>
+                <input id="amount" inputmode="numeric" placeholder="1000000" spellcheck="false" />
+                <p class="field-hint" id="amountHint">Atomic units — 1 TRX = 1000000 sun.</p>
+                <p class="field-err"></p>
+              </div>
+              <div class="field" data-field="transactionId">
+                <label for="transactionId">transaction_id</label>
+                <input id="transactionId" value="tx-1" spellcheck="false" />
+                <p class="field-hint">Scanner item id, not the on-chain txID.</p>
+                <p class="field-err"></p>
+              </div>
+              <div class="field" data-field="tokenId">
+                <label for="tokenId">token_id</label>
+                <input id="tokenId" value="1" inputmode="numeric" spellcheck="false" />
+                <p class="field-hint">Catalog token id sent to the Collect API.</p>
+                <p class="field-err"></p>
+              </div>
+              <div class="field span-2" data-field="contract">
+                <label for="contract">TRC-20 contract <span class="unit">optional</span></label>
+                <div class="input-row">
+                  <input id="contract" placeholder="Leave empty for native TRX" spellcheck="false" />
+                  <button type="button" class="btn tiny" id="btnUseUsdt">Use USDT</button>
+                </div>
+                <p class="field-hint">Empty = native TRX <code>TransferContract</code>. Filled = TRC-20 <code>transfer</code> via <code>TriggerSmartContract</code>.</p>
+                <p class="field-err"></p>
+              </div>
+              <div class="field" data-field="feeLimit" id="fieldFeeLimit" hidden>
+                <label for="feeLimit">fee_limit <span class="unit">sun</span></label>
+                <input id="feeLimit" value="100000000" inputmode="numeric" spellcheck="false" />
+                <p class="field-hint">Max TRX burned for energy — 100000000 sun = 100 TRX.</p>
+                <p class="field-err"></p>
+              </div>
+
+              <div class="group-head-row">
+                <span>Chain validity — from the network</span>
+                <button type="button" class="btn tiny" id="btnFetchBlock">Fetch latest block</button>
+              </div>
+              <div class="field" data-field="refBlockBytes">
+                <label for="refBlockBytes">ref_block_bytes <span class="unit">4 hex</span></label>
+                <input id="refBlockBytes" placeholder="abcd" spellcheck="false" />
+                <p class="field-hint">Low 2 bytes of a recent block number.</p>
+                <p class="field-err"></p>
+              </div>
+              <div class="field" data-field="refBlockHash">
+                <label for="refBlockHash">ref_block_hash <span class="unit">16 hex</span></label>
+                <input id="refBlockHash" placeholder="0123456789abcdef" spellcheck="false" />
+                <p class="field-hint">Bytes 8–16 of the same block id.</p>
+                <p class="field-err"></p>
+              </div>
+              <div class="field" data-field="expiration">
+                <label for="expiration">expiration <span class="unit">ms</span></label>
+                <input id="expiration" inputmode="numeric" placeholder="now + 60s" spellcheck="false" />
+                <p class="field-hint">Empty = now + 60 seconds.</p>
+                <p class="field-err"></p>
+              </div>
+              <div class="field" data-field="timestamp">
+                <label for="timestamp">timestamp <span class="unit">ms</span></label>
+                <input id="timestamp" inputmode="numeric" placeholder="now" spellcheck="false" />
+                <p class="field-hint">Empty = now. Both fields come from the block fetch.</p>
+                <p class="field-err"></p>
+              </div>
+            </div>
+            <p id="blockStatus" class="status-line" role="status" aria-live="polite"></p>
+            <div class="form-actions">
+              <button type="submit" class="btn primary" id="btnBuild">Build unsigned tx</button>
+              <span class="form-note">An old reference block is rejected by the network — re-fetch right before broadcasting.</span>
+            </div>
+            <p class="alert err" id="buildError" role="alert" hidden></p>
+          </form>
+
+          <div class="result" id="result-1" hidden>
+            <div class="facts">
+              <div class="fact"><span>Mode</span><strong id="factMode">—</strong></div>
+              <div class="fact"><span>Amount</span><strong id="factAmount">—</strong></div>
+              <div class="fact"><span>Fees</span><strong id="factFee">—</strong></div>
+              <div class="fact"><span>Signer</span><strong id="factSigner">—</strong></div>
+            </div>
+            <p class="callout" id="trc20Note" hidden></p>
+            <div class="code-card">
+              <div class="code-head">
+                <span class="code-title">Unsigned transaction <span class="badge">raw_data</span></span>
+                <div class="code-tools">
+                  <span class="chip" id="txTypeChip">—</span>
+                  <button type="button" class="btn tiny" data-copy="txJsonPreview">Copy</button>
+                </div>
+              </div>
+              <pre class="code" id="txJsonPreview"></pre>
+            </div>
+            <p class="result-note">This object is a readable view. The bytes that get hashed come from its <strong>protobuf</strong> encoding in step 2 — Ethereum uses RLP for the same job, Tron uses protobuf.</p>
+          </div>
+        </div>
+      </article>
+
+      <!-- STEP 2 -->
+      <article class="step-card is-locked" id="step-2">
+        <div class="step-head">
+          <span class="step-number" aria-hidden="true">2</span>
+          <div class="step-titles">
+            <h3>Encode protobuf &amp; compute txID</h3>
+            <p>raw_data → protobuf bytes → SHA-256. The 32-byte txID is what gets signed.</p>
+          </div>
+          <span class="pill locked" id="status-2">Locked</span>
+        </div>
+        <div class="lock-note" id="lock-2">Build the transaction first — the txID is computed from its protobuf encoding.</div>
+        <div class="step-body" id="body-2" hidden>
+          <div class="actions-row">
+            <button type="button" class="btn primary" id="btnHash">Compute txID</button>
+            <span class="form-note">Deterministic: same raw_data → same bytes → same txID.</span>
+          </div>
+          <div class="result" id="result-2" hidden>
+            <div class="hash-feature">
+              <div class="hash-head">
+                <span class="hash-key">txID · sha256(raw_data)</span>
+                <button type="button" class="btn tiny" data-copy="unsignedHash">Copy</button>
+              </div>
+              <code class="hash-value" id="unsignedHash"></code>
+              <span class="hash-note">SHA-256, not keccak256. Tron hashes protobuf bytes; Ethereum hashes keccak256(RLP).</span>
+            </div>
+            <div class="code-card">
+              <div class="code-head">
+                <span class="code-title">Protobuf-encoded raw_data <span class="badge">raw_data_hex</span></span>
+                <div class="code-tools">
+                  <span class="chip" id="rlpMeta">—</span>
+                  <button type="button" class="btn tiny" data-copy="unsignedRlp">Copy</button>
+                </div>
+              </div>
+              <pre class="code" id="unsignedRlp"></pre>
+            </div>
+            <p class="result-note">Your private key signs the txID digest — it never signs the JSON above. The signature is stored outside raw_data, so the txID stays valid after signing.</p>
+          </div>
+        </div>
+      </article>
+
+      <!-- STEP 3 -->
+      <article class="step-card is-locked" id="step-3">
+        <div class="step-head">
+          <span class="step-number" aria-hidden="true">3</span>
+          <div class="step-titles">
+            <h3>Sign the txID</h3>
+            <p>secp256k1 ECDSA over the 32-byte txID. The 65-byte signature is attached as r ‖ s ‖ v.</p>
+          </div>
+          <span class="pill locked" id="status-3">Locked</span>
+        </div>
+        <div class="lock-note" id="lock-3">Compute the txID first.</div>
+        <div class="step-body" id="body-3" hidden>
+          <div class="sign-bar">
+            <div class="sign-ctx"><span class="mini-label">Signer</span><code id="signerChip">no wallet</code></div>
+            <div class="sign-ctx"><span class="mini-label">txID</span><code id="hashChip">—</code></div>
+          </div>
+          <div class="actions-row">
+            <button type="button" class="btn primary" id="btnSign">Sign transaction</button>
+            <span class="form-note">Success is reported only after the recovered signer is verified.</span>
+          </div>
+          <div class="result" id="result-3" hidden>
+            <div class="verify">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="m5 12 4.2 4.2L19 6.5"/>
+              </svg>
+              <div>
+                <strong>Signature verified</strong>
+                <span id="verifyText"></span>
+              </div>
+            </div>
+            <div class="code-card">
+              <div class="code-head">
+                <span class="code-title">Signed transaction <span class="badge">txID + raw_data + signature</span></span>
+                <button type="button" class="btn tiny" data-copy="signedTx">Copy</button>
+              </div>
+              <pre class="code" id="signedTx"></pre>
+            </div>
+            <div class="two-col">
+              <div class="code-card">
+                <div class="code-head">
+                  <span class="code-title">Signature parts</span>
+                  <button type="button" class="btn tiny" data-copy="signatureJson">Copy</button>
+                </div>
+                <pre class="code" id="signatureJson"></pre>
+              </div>
+              <div class="code-card">
+                <div class="code-head">
+                  <span class="code-title">txID check</span>
+                  <button type="button" class="btn tiny" data-copy="signedTxHash">Copy</button>
+                </div>
+                <pre class="code" id="signedTxHash"></pre>
+              </div>
+            </div>
+            <div class="actions-row">
+              <button type="button" class="btn" id="btnGotoExport">Go to export ↓</button>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <!-- STEP 4 -->
+      <article class="step-card is-locked" id="step-4">
+        <div class="step-head">
+          <span class="step-number" aria-hidden="true">4</span>
+          <div class="step-titles">
+            <h3>Copy the export</h3>
+            <p>The exact JSON the Collect API expects, with the signed transaction inside.</p>
+          </div>
+          <span class="pill locked" id="status-4">Locked</span>
+        </div>
+        <div class="lock-note" id="lock-4">Sign the transaction to unlock the final payload.</div>
+        <div class="step-body" id="body-4" hidden>
+          <div class="result" id="result-4" hidden>
+            <div class="export-banner">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="m5 12 4.2 4.2L19 6.5"/>
+              </svg>
+              <div>
+                <strong>Ready to send</strong>
+                <span>Copy the item or the full CollectRequest. Both contain the same signed transaction.</span>
+              </div>
+            </div>
+            <div class="code-card">
+              <div class="code-head">
+                <span class="code-title">Collect item <span class="badge">items[]</span></span>
+                <div class="code-tools">
+                  <button type="button" class="btn tiny" id="btnDownloadItem">Download</button>
+                  <button type="button" class="btn tiny" data-copy="itemJson">Copy</button>
+                </div>
+              </div>
+              <pre class="code" id="itemJson"></pre>
+            </div>
+            <div class="code-card">
+              <div class="code-head">
+                <span class="code-title">CollectRequest <span class="badge">request body</span></span>
+                <div class="code-tools">
+                  <button type="button" class="btn tiny" id="btnDownloadRequest">Download</button>
+                  <button type="button" class="btn tiny" data-copy="requestJson">Copy</button>
+                </div>
+              </div>
+              <pre class="code" id="requestJson"></pre>
+            </div>
+            <div class="endpoint">
+              <div><span>gRPC</span><code>tron_scanner.TransactionService/Collect</code></div>
+            </div>
+            <p class="result-note">The request is <code>{ "items": [ item ] }</code>. Send it with Postman or grpcurl.</p>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <!-- ================= INSPECT ================= -->
+    <section class="tab-panel" id="panel-inspect" role="tabpanel" aria-labelledby="tab-inspect" hidden>
+      <div class="panel">
+        <div class="section-head">
+          <div>
+            <div class="eyebrow">Decoder</div>
+            <h2>Inspect a Tron transaction</h2>
+            <p>Paste raw_data_hex, a signed tx JSON, or a whole Collect item. The page decodes the protobuf, recomputes the txID and recovers the signer — no key needed.</p>
+          </div>
+        </div>
+        <div class="panel-grid">
+          <div>
+            <div class="field" data-field="inspectInput">
+              <label for="inspectInput">Transaction <span class="unit">hex or JSON</span></label>
+              <textarea id="inspectInput" class="paste-area" spellcheck="false" placeholder="0a02abcd…    ← raw_data_hex&#10;or&#10;{ &quot;txID&quot;: &quot;…&quot;, &quot;raw_data_hex&quot;: &quot;…&quot;, &quot;signature&quot;: [&quot;…&quot;] }&#10;or a Collect item with signed_tx inside"></textarea>
+              <p class="field-err" id="inspectError"></p>
+              <p class="field-hint">Any layer works: raw hex, unsigned/signed tx JSON, or the final Collect item / request.</p>
+            </div>
+            <div class="actions-row">
+              <button type="button" class="btn primary" id="btnInspect">Decode &amp; verify</button>
+              <button type="button" class="btn ghost" id="btnInspectFromFlow" disabled>Use current tx</button>
+              <button type="button" class="btn ghost" id="btnInspectClear">Clear</button>
+            </div>
+            <p id="inspectStatus" class="status-line" role="status" aria-live="polite"></p>
+            <div class="result" id="inspectResult" hidden>
+              <div class="facts">
+                <div class="fact"><span>Contract</span><strong id="inspectType">—</strong></div>
+                <div class="fact"><span>Amount</span><strong id="inspectAmount">—</strong></div>
+                <div class="fact"><span>Expires</span><strong id="inspectExpiry">—</strong></div>
+                <div class="fact"><span>Input</span><strong id="inspectKind">—</strong></div>
+              </div>
+              <div class="hash-feature">
+                <div class="hash-head">
+                  <span class="hash-key">txID · sha256(raw_data)</span>
+                  <button type="button" class="btn tiny" data-copy="inspectHash">Copy</button>
+                </div>
+                <code class="hash-value" id="inspectHash"></code>
+                <span class="hash-note">Recomputed locally from the decoded protobuf bytes. One-way — decode the protobuf below instead.</span>
+              </div>
+              <p class="callout" id="inspectData"></p>
+              <div class="verify" id="inspectSignerBox" hidden>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="m5 12 4.2 4.2L19 6.5"/>
+                </svg>
+                <div>
+                  <strong id="inspectSignerTitle">Signature verified</strong>
+                  <span id="inspectSignerText"></span>
+                </div>
+              </div>
+              <div class="alert warn" id="inspectTxIdWarn" hidden style="margin-bottom: 12px;"></div>
+              <div class="code-card">
+                <div class="code-head">
+                  <span class="code-title">Decoded raw_data <span class="badge">fields</span></span>
+                  <button type="button" class="btn tiny" data-copy="inspectJson">Copy</button>
+                </div>
+                <pre class="code" id="inspectJson"></pre>
+              </div>
+              <div class="code-card">
+                <div class="code-head">
+                  <span class="code-title">Protobuf raw_data <span class="badge">raw_data_hex</span></span>
+                  <div class="code-tools">
+                    <span class="chip" id="inspectRlpMeta">—</span>
+                    <button type="button" class="btn tiny" data-copy="inspectRlp">Copy</button>
+                  </div>
+                </div>
+                <pre class="code" id="inspectRlp"></pre>
+              </div>
+              <p class="result-note">The signature lives outside raw_data, so it is not part of the txID digest — unlike Ethereum, where the signature is folded into the signed RLP. Amounts are shown as strings to avoid BigInt loss.</p>
+            </div>
+          </div>
+          <aside class="aside">
+            <h3>How to read this</h3>
+            <ul class="bullets">
+              <li><strong>txID</strong> — SHA-256 of the protobuf-encoded raw_data. Fingerprint of what the key signed.</li>
+              <li><strong>Decoded fields</strong> — ref block, timestamps, contract, owner, recipient, amount, fee_limit.</li>
+              <li><strong>Signer</strong> — recovered from the signature when present, and checked against the owner address.</li>
+            </ul>
+            <div class="side-flow">
+              <span class="side-flow-label">Accepted input</span>
+              <div class="mini-pipeline">
+                <span>raw_data_hex</span><i>·</i><span>tx JSON</span><i>·</i><span>Collect item</span>
+              </div>
+            </div>
+            <p class="aside-note">Everything runs locally with ethers v6 + a hand-rolled protobuf decoder. Never sign a bare txID you cannot tie back to these decoded fields.</p>
+          </aside>
+        </div>
       </div>
-      <p id="signStatus" class="hint"></p>
-      <pre id="signOut"></pre>
     </section>
   </main>
+
+  <footer>
+    <span>Runs entirely in your browser · ethers v6 · protobuf + SHA-256 + secp256k1 · the only network call is the TronGrid block fetch.</span>
+    <span>Built for the Collect flow</span>
+  </footer>
+
+  <div class="toasts" id="toasts" aria-live="polite" aria-atomic="false"></div>
+
   <script>
-    const ATOMIC = /^(0|[1-9][0-9]{0,64})$/;
-    const TOKEN_ID = /^[1-9][0-9]*$/;
-    const TX_ID = /^[A-Za-z0-9_-]{1,64}$/;
-    const B58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
-    const TRANSFER_TYPE_URL = "type.googleapis.com/protocol.TransferContract";
-    const TRIGGER_TYPE_URL = "type.googleapis.com/protocol.TriggerSmartContract";
-    const ZERO_ADDRESS = "T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb";
-    const USDT_CONTRACT = "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t";
-    const TRONGRID_URL = "https://api.trongrid.io/wallet/getnowblock";
+    (function () {
+      "use strict";
 
-    const $ = (id) => document.getElementById(id);
-    const statusEl = (id, text, cls) => {
-      const el = $(id);
-      el.className = "hint " + (cls || "");
-      el.textContent = text;
-    };
-    const copy = async (text) => {
-      await navigator.clipboard.writeText(text);
-    };
+      const $ = (id) => document.getElementById(id);
+      const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
+      const motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+      const scrollBehavior = () => (motionQuery.matches ? "auto" : "smooth");
 
-    let lastJson = "";
-
-    const assetLabel = () => ($("contract").value.trim() ? "USDT (TRC-20)" : "native TRX");
-
-    $("btnUseUsdt").onclick = () => {
-      $("contract").value = USDT_CONTRACT;
-    };
-
-    const fetchLatestBlock = async () => {
-      const button = $("btnFetchBlock");
-      button.disabled = true;
-      statusEl("blockStatus", "Fetching latest block from TronGrid…", "warn");
-      try {
-        const response = await fetch(TRONGRID_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: "{}",
-          cache: "no-store",
-          signal: AbortSignal.timeout(10_000),
-        });
-        if (!response.ok) throw new Error("HTTP " + response.status);
-        const block = await response.json();
-        const raw = block && block.block_header && block.block_header.raw_data;
-        const number = raw && raw.number;
-        const blockID = block && block.blockID;
-        if (
-          !Number.isSafeInteger(number) ||
-          typeof blockID !== "string" ||
-          !/^[0-9a-fA-F]{64}$/.test(blockID)
-        ) {
-          throw new Error("unexpected response");
-        }
-        const blockTime = Number.isSafeInteger(raw.timestamp) ? raw.timestamp : Date.now();
-        $("refBlockBytes").value = (number % 0x10000).toString(16).padStart(4, "0");
-        $("refBlockHash").value = blockID.slice(16, 32).toLowerCase();
-        $("timestamp").value = String(blockTime);
-        $("expiration").value = String(blockTime + 60_000);
-        statusEl(
-          "blockStatus",
-          "Filled from block #" + number + ". Re-fetch right before broadcasting.",
-          "ok",
-        );
-      } catch (error) {
-        statusEl("blockStatus", "Could not fetch the block: " + error.message, "err");
-      } finally {
-        button.disabled = false;
-      }
-    };
-
-    $("btnFetchBlock").onclick = fetchLatestBlock;
-
-    const hexToBytes = (hex) => {
-      const h = String(hex).replace(/^0x/i, "");
-      if (!/^[0-9a-fA-F]*$/.test(h) || h.length % 2 !== 0) {
-        throw new Error("Invalid hex.");
-      }
-      const out = new Uint8Array(h.length / 2);
-      for (let i = 0; i < out.length; i += 1) {
-        out[i] = parseInt(h.slice(i * 2, i * 2 + 2), 16);
-      }
-      return out;
-    };
-
-    const bytesToHex = (bytes) =>
-      [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
-
-    const concat = (parts) => {
-      const len = parts.reduce((n, p) => n + p.length, 0);
-      const out = new Uint8Array(len);
-      let offset = 0;
-      for (const part of parts) {
-        out.set(part, offset);
-        offset += part.length;
-      }
-      return out;
-    };
-
-    const encodeVarint = (value) => {
-      let n = BigInt(value);
-      if (n < 0n) throw new Error("Protobuf varint must be >= 0.");
-      const out = [];
-      while (n >= 0x80n) {
-        out.push(Number((n & 0x7fn) | 0x80n));
-        n >>= 7n;
-      }
-      out.push(Number(n));
-      return Uint8Array.from(out);
-    };
-
-    const fieldKey = (field, wire) => encodeVarint((field << 3) | wire);
-    const fieldVarint = (field, value) => concat([fieldKey(field, 0), encodeVarint(value)]);
-    const fieldBytes = (field, data) =>
-      concat([fieldKey(field, 2), encodeVarint(data.length), data]);
-
-    const sha256 = (bytes) => hexToBytes(ethers.sha256(ethers.hexlify(bytes)));
-
-    const base58Encode = (bytes) => {
-      let zeros = 0;
-      while (zeros < bytes.length && bytes[zeros] === 0) zeros += 1;
-      const digits = [0];
-      for (let i = zeros; i < bytes.length; i += 1) {
-        let carry = bytes[i];
-        for (let j = 0; j < digits.length; j += 1) {
-          carry += digits[j] << 8;
-          digits[j] = carry % 58;
-          carry = (carry / 58) | 0;
-        }
-        while (carry > 0) {
-          digits.push(carry % 58);
-          carry = (carry / 58) | 0;
-        }
-      }
-      let out = "1".repeat(zeros);
-      for (let i = digits.length - 1; i >= 0; i -= 1) out += B58[digits[i]];
-      return out;
-    };
-
-    const base58Decode = (text) => {
-      if (!/^[1-9A-HJ-NP-Za-km-z]+$/.test(text)) return null;
-      const bytes = [0];
-      for (const ch of text) {
-        let carry = B58.indexOf(ch);
-        if (carry < 0) return null;
-        for (let j = 0; j < bytes.length; j += 1) {
-          carry += bytes[j] * 58;
-          bytes[j] = carry & 0xff;
-          carry >>= 8;
-        }
-        while (carry > 0) {
-          bytes.push(carry & 0xff);
-          carry >>= 8;
-        }
-      }
-      let zeros = 0;
-      while (zeros < text.length && text[zeros] === "1") zeros += 1;
-      return Uint8Array.from([...new Array(zeros).fill(0), ...bytes.reverse()]);
-    };
-
-    const base58Check = (payload) => {
-      const checksum = sha256(sha256(payload)).slice(0, 4);
-      return base58Encode(concat([payload, checksum]));
-    };
-
-    const decodeBase58Check = (address) => {
-      const decoded = base58Decode(address);
-      if (!decoded || decoded.length < 5) return null;
-      const payload = decoded.slice(0, decoded.length - 4);
-      const checksum = decoded.slice(decoded.length - 4);
-      const expected = sha256(sha256(payload)).slice(0, 4);
-      for (let i = 0; i < 4; i += 1) {
-        if (checksum[i] !== expected[i]) return null;
-      }
-      return payload;
-    };
-
-    const addressPayload = (address) => {
-      const trimmed = address.trim();
-      if (trimmed.startsWith("T")) {
-        const payload = decodeBase58Check(trimmed);
-        if (!payload || payload.length !== 21 || payload[0] !== 0x41) return null;
-        return payload;
-      }
-      const hex = trimmed.replace(/^0x/i, "");
-      if (!/^[0-9a-fA-F]+$/.test(hex) || hex.length % 2 !== 0) return null;
-      const bytes = hexToBytes(hex);
-      if (bytes.length === 20) return concat([Uint8Array.of(0x41), bytes]);
-      if (bytes.length === 21 && bytes[0] === 0x41) return bytes;
-      return null;
-    };
-
-    const isTronAddress = (address) => addressPayload(address) != null;
-
-    const normalizeAddress = (address) => {
-      const payload = addressPayload(address);
-      if (!payload) throw new Error("Invalid Tron address.");
-      return base58Check(payload);
-    };
-
-    const addressHex = (address) => bytesToHex(addressPayload(address));
-
-    const privateKeyHex = (value) => {
-      const hex = String(value || "").trim().replace(/^0x/i, "");
-      if (!/^[0-9a-fA-F]{64}$/.test(hex)) throw new Error("Private key must be 32 bytes hex.");
-      return hex.toLowerCase();
-    };
-
-    const addressFromPrivateKey = (value) => {
-      const hex = privateKeyHex(value);
-      const signingKey = new ethers.SigningKey("0x" + hex);
-      const hash = ethers.keccak256("0x" + signingKey.publicKey.slice(4));
-      const payload = hexToBytes("41" + hash.slice(-40));
-      return base58Check(payload);
-    };
-
-    const walletFromForm = () => {
-      const key = $("privateKey").value.trim();
-      if (!key) throw new Error("Generate or load a private key first.");
-      return { privateKey: privateKeyHex(key), address: addressFromPrivateKey(key) };
-    };
-
-    const jsonAmount = (amount) =>
-      BigInt(amount) <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(amount) : amount;
-
-    const encodeTransfer = (owner, to, amount) => {
-      const parts = [fieldBytes(1, owner), fieldBytes(2, to)];
-      if (BigInt(amount) !== 0n) parts.push(fieldVarint(3, amount));
-      return concat(parts);
-    };
-
-    const encodeTrigger = (owner, contract, data) =>
-      concat([fieldBytes(1, owner), fieldBytes(2, contract), fieldBytes(4, data)]);
-
-    const encodeAny = (typeUrl, value) =>
-      concat([
-        fieldBytes(1, new TextEncoder().encode(typeUrl)),
-        fieldBytes(2, value),
-      ]);
-
-    const encodeRaw = ({ refBlockBytes, refBlockHash, expiration, timestamp, feeLimit, contractType, typeUrl, parameter }) => {
-      const any = encodeAny(typeUrl, parameter);
-      const contract = concat([fieldVarint(1, contractType), fieldBytes(2, any)]);
-      const parts = [
-        fieldBytes(1, refBlockBytes),
-        fieldBytes(4, refBlockHash),
-        fieldVarint(8, expiration),
-        fieldBytes(11, contract),
-        fieldVarint(14, timestamp),
-      ];
-      if (feeLimit != null) parts.push(fieldVarint(18, feeLimit));
-      return concat(parts);
-    };
-
-    const signRaw = (privateKey, raw) => {
-      const txID = bytesToHex(sha256(raw));
-      const sig = new ethers.SigningKey("0x" + privateKey).sign(ethers.hexlify(sha256(raw)));
-      const signature =
-        sig.r.slice(2).padStart(64, "0") +
-        sig.s.slice(2).padStart(64, "0") +
-        Number(sig.v).toString(16).padStart(2, "0");
-      return { txID, signature: signature.toLowerCase() };
-    };
-
-    $("btnGenerate").onclick = () => {
-      const wallet = ethers.Wallet.createRandom();
-      const privateKey = wallet.privateKey.slice(2);
-      const address = addressFromPrivateKey(privateKey);
-      $("address").value = address;
-      $("privateKey").value = privateKey;
-      $("scanAddress").value = address;
-      statusEl("walletStatus", "New keypair in this tab only.", "ok");
-    };
-
-    $("btnToggleKey").onclick = () => {
-      $("privateKey").classList.toggle("show");
-      $("btnToggleKey").textContent = $("privateKey").classList.contains("show")
-        ? "Hide key"
-        : "Show key";
-    };
-
-    $("btnDownload").onclick = () => {
-      const address = $("address").value.trim();
-      const privateKey = $("privateKey").value.trim();
-      if (!address || !privateKey) {
-        statusEl("walletStatus", "Generate a wallet first.", "err");
+      if (!window.ethers) {
+        const banner = document.createElement("div");
+        banner.className = "fatal";
+        banner.textContent = "ethers.js could not be loaded from the CDN. Check your connection and reload this page.";
+        document.body.prepend(banner);
         return;
       }
-      const blob = new Blob(
-        [JSON.stringify({ address, privateKey }, null, 2)],
-        { type: "application/json" },
-      );
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = "wallet.json";
-      a.click();
-      URL.revokeObjectURL(a.href);
-    };
 
-    $("btnLoad").onclick = () => $("file").click();
-    $("file").onchange = async (event) => {
-      const file = event.target.files && event.target.files[0];
-      if (!file) return;
-      try {
-        const parsed = JSON.parse(await file.text());
-        const privateKey = privateKeyHex(parsed.privateKey || parsed.private_key);
-        const address = addressFromPrivateKey(privateKey);
-        if (parsed.address && normalizeAddress(parsed.address) !== address) {
-          throw new Error("private key does not match address.");
-        }
-        $("address").value = address;
-        $("privateKey").value = privateKey;
-        $("scanAddress").value = address;
-        statusEl("walletStatus", "Loaded " + file.name, "ok");
-      } catch (error) {
-        statusEl("walletStatus", error.message, "err");
-      }
-    };
-
-    const scanPayload = () => {
-      const address = ($("scanAddress").value || $("address").value).trim();
-      if (!isTronAddress(address)) throw new Error("Need a valid address to scan.");
-      return {
-        operation: "ADDRESS_OPERATION_ADD",
-        addresses: [normalizeAddress(address)],
+      const ATOMIC = /^(0|[1-9][0-9]{0,64})$/;
+      const TOKEN_ID = /^[1-9][0-9]*$/;
+      const TX_ID = /^[A-Za-z0-9_-]{1,64}$/;
+      const UINT = /^\d+$/;
+      const UINT_POS = /^[1-9]\d*$/;
+      const HEX_4 = /^[0-9a-fA-F]{4}$/;
+      const HEX_16 = /^[0-9a-fA-F]{16}$/;
+      const B58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+      const TRANSFER_TYPE_URL = "type.googleapis.com/protocol.TransferContract";
+      const TRIGGER_TYPE_URL = "type.googleapis.com/protocol.TriggerSmartContract";
+      const TRANSFER_TYPE = 1;
+      const TRIGGER_TYPE = 31;
+      const ZERO_ADDRESS = "T9yD14Nj9j7xAB4dbGeiX9h8unkKHxuWwb";
+      const USDT_CONTRACT = "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t";
+      const TRONGRID_URL = "https://api.trongrid.io/wallet/getnowblock";
+      const CONTRACT_TYPES = {
+        1: "TransferContract",
+        31: "TriggerSmartContract",
       };
-    };
 
-    $("btnScan").onclick = () => {
-      try {
-        const payload = scanPayload();
-        lastJson = JSON.stringify(payload, null, 2);
-        $("scanOut").textContent = lastJson;
-      } catch (error) {
-        $("scanOut").textContent = error.message;
-      }
-    };
+      let wallet = null;
 
-    $("btnCopyScan").onclick = async () => {
-      if (!$("scanOut").textContent) return;
-      await copy($("scanOut").textContent);
-    };
+      const flow = {
+        busy: false,
+        built: false,
+        hashed: false,
+        signed: false,
+        values: null,
+        snapshot: "",
+        owner: "",
+        rawData: null,
+        parts: null,
+        raw: null,
+        rawHex: "",
+        txId: "",
+        isTrc20: false,
+        toAddress: "",
+        amount: "",
+        signature: "",
+        signatureParts: null,
+        recovered: "",
+        item: null,
+        itemText: "",
+        requestText: "",
+      };
 
-    const buildItem = async () => {
-      const wallet = walletFromForm();
-      const to = $("to").value.trim();
-      const amount = $("amount").value.trim();
-      const transactionId = $("transactionId").value.trim();
-      const tokenId = $("tokenId").value.trim();
-      const contract = $("contract").value.trim();
-      const refBlockBytesHex = $("refBlockBytes").value.trim();
-      const refBlockHashHex = $("refBlockHash").value.trim();
-      if (!isTronAddress(to)) throw new Error("to_address is invalid.");
-      if (!ATOMIC.test(amount)) throw new Error("amount must be an Atomic Unit integer string.");
-      if (!TX_ID.test(transactionId)) {
-        throw new Error('transaction_id must be 1-64 chars of letters, digits, "_" or "-".');
-      }
-      if (!TOKEN_ID.test(tokenId)) throw new Error("token_id must be a positive integer string.");
-      if (contract && !isTronAddress(contract)) throw new Error("contract is invalid.");
-      if (!/^[0-9a-fA-F]{4}$/.test(refBlockBytesHex)) {
-        throw new Error("ref_block_bytes must be 4 hex chars.");
-      }
-      if (!/^[0-9a-fA-F]{16}$/.test(refBlockHashHex)) {
-        throw new Error("ref_block_hash must be 16 hex chars.");
+      /* ---------- helpers ---------- */
+
+      function shortAddress(address) {
+        if (!address) return "no wallet";
+        return address.slice(0, 6) + "…" + address.slice(-4);
       }
 
-      const from = normalizeAddress(wallet.address);
-      const toAddress = normalizeAddress(to);
-      if (from === toAddress || from === ZERO_ADDRESS || toAddress === ZERO_ADDRESS) {
-        throw new Error("from_address and to_address must differ and cannot be the zero address.");
+      function shortHash(hash) {
+        if (!hash) return "—";
+        return hash.slice(0, 10) + "…" + hash.slice(-6);
       }
 
-      const now = Date.now();
-      const expirationText = $("expiration").value.trim();
-      const timestampText = $("timestamp").value.trim();
-      const expiration = BigInt(expirationText || String(now + 60_000));
-      const timestamp = BigInt(timestampText || String(now));
-      const maxSafe = BigInt(Number.MAX_SAFE_INTEGER);
-      if (expiration < 0n || timestamp < 0n || expiration > maxSafe || timestamp > maxSafe) {
-        throw new Error("expiration and timestamp must be safe integers >= 0.");
-      }
-
-      const ownerBytes = addressPayload(from);
-      let parameter;
-      let contractType;
-      let typeUrl;
-      let feeLimit = null;
-      let value;
-      if (contract) {
-        const contractAddress = normalizeAddress(contract);
-        if (contractAddress === from || contractAddress === ZERO_ADDRESS) {
-          throw new Error("contract is invalid.");
+      function formatSun(sun) {
+        try {
+          const value = BigInt(sun);
+          const whole = value / 1000000n;
+          const frac = (value % 1000000n).toString().padStart(6, "0").replace(/0+$/, "");
+          return frac ? whole.toString() + "." + frac + " TRX" : whole.toString() + " TRX";
+        } catch {
+          return "—";
         }
-        const toWord = bytesToHex(addressPayload(toAddress).slice(1)).padStart(64, "0");
-        const amountWord = BigInt(amount).toString(16).padStart(64, "0");
-        const data = hexToBytes("a9059cbb" + toWord + amountWord);
-        parameter = encodeTrigger(ownerBytes, addressPayload(contractAddress), data);
-        contractType = 31;
-        typeUrl = TRIGGER_TYPE_URL;
-        feeLimit = BigInt($("feeLimit").value.trim() || "100000000");
-        if (feeLimit <= 0n || feeLimit > BigInt(Number.MAX_SAFE_INTEGER)) {
-          throw new Error("fee_limit must be a positive integer in sun (required for USDT/TRC-20).");
-        }
-        value = {
-          owner_address: addressHex(from),
-          contract_address: addressHex(contractAddress),
-          data: bytesToHex(data),
-          call_value: 0,
-        };
-      } else {
-        parameter = encodeTransfer(ownerBytes, addressPayload(toAddress), amount);
-        contractType = 1;
-        typeUrl = TRANSFER_TYPE_URL;
-        value = {
-          amount: jsonAmount(amount),
-          owner_address: addressHex(from),
-          to_address: addressHex(toAddress),
-        };
       }
 
-      const raw = encodeRaw({
-        refBlockBytes: hexToBytes(refBlockBytesHex),
-        refBlockHash: hexToBytes(refBlockHashHex),
-        expiration,
-        timestamp,
-        feeLimit,
-        contractType,
-        typeUrl,
-        parameter,
+      function setWalletStatus(text, type) {
+        const el = $("walletStatus");
+        el.textContent = text || "";
+        el.className = "status-line" + (type ? " " + type : "");
+      }
+
+      function setBlockStatus(text, type) {
+        const el = $("blockStatus");
+        el.textContent = text || "";
+        el.className = "status-line" + (type ? " " + type : "");
+      }
+
+      function toast(message, type) {
+        const container = $("toasts");
+        while (container.children.length >= 3) container.firstElementChild.remove();
+        const el = document.createElement("div");
+        el.className = "toast " + (type || "info");
+        el.textContent = message;
+        container.appendChild(el);
+        setTimeout(() => {
+          el.classList.add("out");
+          setTimeout(() => el.remove(), 220);
+        }, 2800);
+      }
+
+      async function copyText(text) {
+        if (navigator.clipboard && window.isSecureContext) {
+          try {
+            await navigator.clipboard.writeText(text);
+            return;
+          } catch {
+            // fall through to the legacy path
+          }
+        }
+        const area = document.createElement("textarea");
+        area.value = text;
+        area.setAttribute("readonly", "");
+        area.style.position = "fixed";
+        area.style.left = "-9999px";
+        document.body.appendChild(area);
+        area.select();
+        const ok = document.execCommand("copy");
+        area.remove();
+        if (!ok) throw new Error("Copy failed");
+      }
+
+      function flashCopied(btn) {
+        if (!btn.dataset.label) btn.dataset.label = btn.textContent;
+        btn.textContent = "Copied";
+        btn.classList.add("copied");
+        clearTimeout(btn._copyTimer);
+        btn._copyTimer = setTimeout(() => {
+          btn.textContent = btn.dataset.label;
+          btn.classList.remove("copied");
+        }, 1400);
+      }
+
+      function download(filename, text) {
+        const blob = new Blob([text], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }
+
+      function setButtonBusy(btn, busy, label) {
+        if (busy) {
+          if (!btn.dataset.idleHtml) btn.dataset.idleHtml = btn.innerHTML;
+          btn.disabled = true;
+          btn.classList.add("is-busy");
+          btn.setAttribute("aria-busy", "true");
+          btn.innerHTML = '<span class="spinner" aria-hidden="true"></span><span>' + label + "</span>";
+          return;
+        }
+        btn.classList.remove("is-busy");
+        btn.removeAttribute("aria-busy");
+        if (btn.dataset.idleHtml) {
+          btn.innerHTML = btn.dataset.idleHtml;
+          delete btn.dataset.idleHtml;
+        }
+        btn.disabled = false;
+      }
+
+      function wait(ms) {
+        return new Promise((resolve) => setTimeout(resolve, ms));
+      }
+
+      function setCode(id, text) {
+        const el = $(id);
+        el.textContent = text;
+        el.scrollTop = 0;
+        el.scrollLeft = 0;
+      }
+
+      function scrollToStep(n) {
+        const card = $("step-" + n);
+        if (!card) return;
+        setTimeout(() => card.scrollIntoView({ behavior: scrollBehavior(), block: "start" }), 160);
+      }
+
+      function scrollToResult(id) {
+        const el = $(id);
+        if (!el) return;
+        setTimeout(() => el.scrollIntoView({ behavior: scrollBehavior(), block: "center" }), 160);
+      }
+
+      /* ---------- copy (works for inputs and code blocks) ---------- */
+
+      document.addEventListener("click", async (event) => {
+        const btn = event.target.closest("[data-copy]");
+        if (!btn || btn.disabled) return;
+        const source = $(btn.dataset.copy);
+        if (!source) return;
+        const text = ("value" in source ? source.value : source.textContent).trim();
+        if (!text) {
+          toast("Nothing to copy yet.", "warn");
+          return;
+        }
+        try {
+          await copyText(text);
+          flashCopied(btn);
+          if (btn.hasAttribute("data-sensitive")) {
+            toast("Private key copied — handle with care.", "warn");
+          } else {
+            toast("Copied to clipboard.", "success");
+          }
+        } catch {
+          toast("Copy failed — select the text and copy it manually.", "error");
+        }
       });
-      const signed = signRaw(wallet.privateKey, raw);
-      const rawData = {
-        contract: [
-          {
-            parameter: { value, type_url: typeUrl },
-            type: contract ? "TriggerSmartContract" : "TransferContract",
-          },
-        ],
-        ref_block_bytes: refBlockBytesHex.toLowerCase(),
-        ref_block_hash: refBlockHashHex.toLowerCase(),
-        expiration: Number(expiration),
-        timestamp: Number(timestamp),
-      };
-      if (feeLimit != null) rawData.fee_limit = Number(feeLimit);
-      const signedTx = {
-        visible: false,
-        txID: signed.txID,
-        raw_data: rawData,
-        raw_data_hex: bytesToHex(raw),
-        signature: [signed.signature],
-      };
 
-      return {
-        transaction_id: transactionId,
-        from_address: from,
-        to_address: toAddress,
-        token_id: tokenId,
-        amount,
-        signed_tx: JSON.stringify(signedTx),
-      };
-    };
+      /* ---------- tabs ---------- */
 
-    $("btnSign").onclick = async () => {
-      try {
-        const item = await buildItem();
-        lastJson = JSON.stringify(item, null, 2);
-        $("signOut").textContent = lastJson;
-        statusEl(
-          "signStatus",
-          "Signed " + assetLabel() + " in-browser. Ready for Collect.",
-          "ok",
-        );
-      } catch (error) {
-        lastJson = "";
-        $("signOut").textContent = "";
-        statusEl("signStatus", error.message, "err");
+      const tabButtons = $$(".tab");
+
+      function switchTab(name) {
+        tabButtons.forEach((tab) => {
+          const active = tab.dataset.tab === name;
+          tab.classList.toggle("active", active);
+          tab.setAttribute("aria-selected", active ? "true" : "false");
+          tab.tabIndex = active ? 0 : -1;
+        });
+        $$(".tab-panel").forEach((panel) => {
+          const active = panel.id === "panel-" + name;
+          panel.classList.toggle("active", active);
+          panel.hidden = !active;
+        });
       }
-    };
 
-    $("btnCollect").onclick = async () => {
-      try {
-        const item = await buildItem();
-        const request = { items: [item] };
-        lastJson = JSON.stringify(request, null, 2);
-        $("signOut").textContent = lastJson;
-        statusEl(
-          "signStatus",
-          "CollectRequest JSON for " + assetLabel() +
-            ". Send via Postman/grpcurl — browser cannot speak native gRPC.",
+      tabButtons.forEach((tab, index) => {
+        tab.addEventListener("click", () => switchTab(tab.dataset.tab));
+        tab.addEventListener("keydown", (event) => {
+          if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
+          event.preventDefault();
+          const dir = event.key === "ArrowRight" ? 1 : -1;
+          const next = tabButtons[(index + dir + tabButtons.length) % tabButtons.length];
+          switchTab(next.dataset.tab);
+          next.focus();
+        });
+      });
+
+      $("walletPill").addEventListener("click", () => switchTab("wallet"));
+
+      /* ---------- byte helpers ---------- */
+
+      const hexToBytes = (hex) => {
+        const h = String(hex).replace(/^0x/i, "");
+        if (!/^[0-9a-fA-F]*$/.test(h) || h.length % 2 !== 0) {
+          throw new Error("Invalid hex.");
+        }
+        const out = new Uint8Array(h.length / 2);
+        for (let i = 0; i < out.length; i += 1) {
+          out[i] = parseInt(h.slice(i * 2, i * 2 + 2), 16);
+        }
+        return out;
+      };
+
+      const bytesToHex = (bytes) =>
+        [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
+
+      const concat = (parts) => {
+        const len = parts.reduce((n, p) => n + p.length, 0);
+        const out = new Uint8Array(len);
+        let offset = 0;
+        for (const part of parts) {
+          out.set(part, offset);
+          offset += part.length;
+        }
+        return out;
+      };
+
+      const sha256 = (bytes) => hexToBytes(ethers.sha256(ethers.hexlify(bytes)));
+
+      /* ---------- base58 + addresses ---------- */
+
+      const base58Encode = (bytes) => {
+        let zeros = 0;
+        while (zeros < bytes.length && bytes[zeros] === 0) zeros += 1;
+        const digits = [0];
+        for (let i = zeros; i < bytes.length; i += 1) {
+          let carry = bytes[i];
+          for (let j = 0; j < digits.length; j += 1) {
+            carry += digits[j] << 8;
+            digits[j] = carry % 58;
+            carry = (carry / 58) | 0;
+          }
+          while (carry > 0) {
+            digits.push(carry % 58);
+            carry = (carry / 58) | 0;
+          }
+        }
+        let out = "1".repeat(zeros);
+        for (let i = digits.length - 1; i >= 0; i -= 1) out += B58[digits[i]];
+        return out;
+      };
+
+      const base58Decode = (text) => {
+        if (!/^[1-9A-HJ-NP-Za-km-z]+$/.test(text)) return null;
+        const bytes = [0];
+        for (const ch of text) {
+          let carry = B58.indexOf(ch);
+          if (carry < 0) return null;
+          for (let j = 0; j < bytes.length; j += 1) {
+            carry += bytes[j] * 58;
+            bytes[j] = carry & 0xff;
+            carry >>= 8;
+          }
+          while (carry > 0) {
+            bytes.push(carry & 0xff);
+            carry >>= 8;
+          }
+        }
+        let zeros = 0;
+        while (zeros < text.length && text[zeros] === "1") zeros += 1;
+        return Uint8Array.from([...new Array(zeros).fill(0), ...bytes.reverse()]);
+      };
+
+      const base58Check = (payload) => {
+        const checksum = sha256(sha256(payload)).slice(0, 4);
+        return base58Encode(concat([payload, checksum]));
+      };
+
+      const decodeBase58Check = (address) => {
+        const decoded = base58Decode(address);
+        if (!decoded || decoded.length < 5) return null;
+        const payload = decoded.slice(0, decoded.length - 4);
+        const checksum = decoded.slice(decoded.length - 4);
+        const expected = sha256(sha256(payload)).slice(0, 4);
+        for (let i = 0; i < 4; i += 1) {
+          if (checksum[i] !== expected[i]) return null;
+        }
+        return payload;
+      };
+
+      const addressPayload = (address) => {
+        const trimmed = address.trim();
+        if (trimmed.startsWith("T")) {
+          const payload = decodeBase58Check(trimmed);
+          if (!payload || payload.length !== 21 || payload[0] !== 0x41) return null;
+          return payload;
+        }
+        const hex = trimmed.replace(/^0x/i, "");
+        if (!/^[0-9a-fA-F]+$/.test(hex) || hex.length % 2 !== 0) return null;
+        const bytes = hexToBytes(hex);
+        if (bytes.length === 20) return concat([Uint8Array.of(0x41), bytes]);
+        if (bytes.length === 21 && bytes[0] === 0x41) return bytes;
+        return null;
+      };
+
+      const isTronAddress = (address) => addressPayload(address) != null;
+
+      const normalizeAddress = (address) => {
+        const payload = addressPayload(address);
+        if (!payload) throw new Error("Invalid Tron address.");
+        return base58Check(payload);
+      };
+
+      const addressHex = (address) => bytesToHex(addressPayload(address));
+
+      const addressFromBytes = (bytes) => {
+        if (!bytes || bytes.length !== 21 || bytes[0] !== 0x41) return null;
+        return base58Check(bytes);
+      };
+
+      const privateKeyHex = (value) => {
+        const hex = String(value || "").trim().replace(/^0x/i, "");
+        if (!/^[0-9a-fA-F]{64}$/.test(hex)) throw new Error("Private key must be 32 bytes hex.");
+        return hex.toLowerCase();
+      };
+
+      const addressFromPrivateKey = (value) => {
+        const hex = privateKeyHex(value);
+        const signingKey = new ethers.SigningKey("0x" + hex);
+        const hash = ethers.keccak256("0x" + signingKey.publicKey.slice(4));
+        const payload = hexToBytes("41" + hash.slice(-40));
+        return base58Check(payload);
+      };
+
+      /* ---------- protobuf encode ---------- */
+
+      const encodeVarint = (value) => {
+        let n = BigInt(value);
+        if (n < 0n) throw new Error("Protobuf varint must be >= 0.");
+        const out = [];
+        while (n >= 0x80n) {
+          out.push(Number((n & 0x7fn) | 0x80n));
+          n >>= 7n;
+        }
+        out.push(Number(n));
+        return Uint8Array.from(out);
+      };
+
+      const fieldKey = (field, wire) => encodeVarint((field << 3) | wire);
+      const fieldVarint = (field, value) => concat([fieldKey(field, 0), encodeVarint(value)]);
+      const fieldBytes = (field, data) =>
+        concat([fieldKey(field, 2), encodeVarint(data.length), data]);
+
+      const encodeTransfer = (owner, to, amount) => {
+        const parts = [fieldBytes(1, owner), fieldBytes(2, to)];
+        if (BigInt(amount) !== 0n) parts.push(fieldVarint(3, amount));
+        return concat(parts);
+      };
+
+      const encodeTrigger = (owner, contract, data) =>
+        concat([fieldBytes(1, owner), fieldBytes(2, contract), fieldBytes(4, data)]);
+
+      const encodeAny = (typeUrl, value) =>
+        concat([
+          fieldBytes(1, new TextEncoder().encode(typeUrl)),
+          fieldBytes(2, value),
+        ]);
+
+      const encodeRaw = ({ refBlockBytes, refBlockHash, expiration, timestamp, feeLimit, contractType, typeUrl, parameter }) => {
+        const any = encodeAny(typeUrl, parameter);
+        const contract = concat([fieldVarint(1, contractType), fieldBytes(2, any)]);
+        const parts = [
+          fieldBytes(1, refBlockBytes),
+          fieldBytes(4, refBlockHash),
+          fieldVarint(8, expiration),
+          fieldBytes(11, contract),
+          fieldVarint(14, timestamp),
+        ];
+        if (feeLimit != null) parts.push(fieldVarint(18, feeLimit));
+        return concat(parts);
+      };
+
+      /* ---------- protobuf decode ---------- */
+
+      function readVarint(bytes, offset) {
+        let value = 0n;
+        let shift = 0n;
+        let pos = offset;
+        for (;;) {
+          if (pos >= bytes.length) throw new Error("Truncated protobuf varint.");
+          const b = bytes[pos];
+          pos += 1;
+          value |= BigInt(b & 0x7f) << shift;
+          if (!(b & 0x80)) break;
+          shift += 7n;
+          if (shift > 63n) throw new Error("Protobuf varint too long.");
+        }
+        return { value, pos };
+      }
+
+      function decodeFields(bytes) {
+        const fields = [];
+        let i = 0;
+        while (i < bytes.length) {
+          const key = readVarint(bytes, i);
+          i = key.pos;
+          const field = Number(key.value >> 3n);
+          const wire = Number(key.value & 7n);
+          if (field === 0) throw new Error("Invalid protobuf field number.");
+          if (wire === 0) {
+            const r = readVarint(bytes, i);
+            i = r.pos;
+            fields.push({ field, wire, varint: r.value });
+          } else if (wire === 2) {
+            const r = readVarint(bytes, i);
+            const len = Number(r.value);
+            i = r.pos;
+            if (len > bytes.length - i) throw new Error("Truncated protobuf length.");
+            fields.push({ field, wire, bytes: bytes.slice(i, i + len) });
+            i += len;
+          } else if (wire === 1) {
+            if (bytes.length - i < 8) throw new Error("Truncated fixed64.");
+            fields.push({ field, wire, bytes: bytes.slice(i, i + 8) });
+            i += 8;
+          } else if (wire === 5) {
+            if (bytes.length - i < 4) throw new Error("Truncated fixed32.");
+            fields.push({ field, wire, bytes: bytes.slice(i, i + 4) });
+            i += 4;
+          } else {
+            throw new Error("Unsupported protobuf wire type " + wire + ".");
+          }
+        }
+        return fields;
+      }
+
+      function decodeTransferParameter(bytes) {
+        const out = { owner_address: "", to_address: "", amount: "0" };
+        for (const f of decodeFields(bytes)) {
+          if (f.field === 1 && f.bytes) out.owner_address = addressFromBytes(f.bytes) || bytesToHex(f.bytes);
+          if (f.field === 2 && f.bytes) out.to_address = addressFromBytes(f.bytes) || bytesToHex(f.bytes);
+          if (f.field === 3 && f.varint != null) out.amount = f.varint.toString();
+        }
+        return out;
+      }
+
+      function decodeTrc20Call(dataHex) {
+        if (dataHex.length !== 136 || !dataHex.startsWith("a9059cbb")) return null;
+        try {
+          const to = addressFromBytes(hexToBytes("41" + dataHex.slice(32, 72)));
+          const amount = BigInt("0x" + dataHex.slice(72)).toString();
+          return to ? { to, amount } : null;
+        } catch {
+          return null;
+        }
+      }
+
+      function decodeTriggerParameter(bytes) {
+        const out = {
+          owner_address: "",
+          contract_address: "",
+          call_value: "0",
+          data: "",
+        };
+        for (const f of decodeFields(bytes)) {
+          if (f.field === 1 && f.bytes) out.owner_address = addressFromBytes(f.bytes) || bytesToHex(f.bytes);
+          if (f.field === 2 && f.bytes) out.contract_address = addressFromBytes(f.bytes) || bytesToHex(f.bytes);
+          if (f.field === 3 && f.varint != null) out.call_value = f.varint.toString();
+          if (f.field === 4 && f.bytes) out.data = bytesToHex(f.bytes);
+        }
+        const call = out.data ? decodeTrc20Call(out.data) : null;
+        if (call) out.decoded_call = { function: "transfer(address,uint256)", to: call.to, amount: call.amount };
+        return out;
+      }
+
+      function decodeContractField(bytes) {
+        let typeNum = null;
+        let typeUrl = "";
+        let valueBytes = null;
+        for (const f of decodeFields(bytes)) {
+          if (f.field === 1 && f.varint != null) typeNum = Number(f.varint);
+          if (f.field === 2 && f.bytes) {
+            for (const a of decodeFields(f.bytes)) {
+              if (a.field === 1 && a.bytes) typeUrl = new TextDecoder().decode(a.bytes);
+              if (a.field === 2 && a.bytes) valueBytes = a.bytes;
+            }
+          }
+        }
+        if (typeNum == null || !valueBytes) throw new Error("Malformed contract field.");
+        const typeName = CONTRACT_TYPES[typeNum] || ("UnknownType" + typeNum);
+        let parameter;
+        if (typeNum === TRANSFER_TYPE) parameter = decodeTransferParameter(valueBytes);
+        else if (typeNum === TRIGGER_TYPE) parameter = decodeTriggerParameter(valueBytes);
+        else parameter = { hex: bytesToHex(valueBytes) };
+        return { type: typeName, typeNum, typeUrl, parameter };
+      }
+
+      function decodeRawData(bytes) {
+        const raw = {
+          ref_block_bytes: "",
+          ref_block_hash: "",
+          expiration: null,
+          timestamp: null,
+          fee_limit: null,
+          contract: null,
+        };
+        for (const f of decodeFields(bytes)) {
+          if (f.field === 1 && f.bytes) raw.ref_block_bytes = bytesToHex(f.bytes);
+          if (f.field === 4 && f.bytes) raw.ref_block_hash = bytesToHex(f.bytes);
+          if (f.field === 8 && f.varint != null) raw.expiration = f.varint;
+          if (f.field === 11 && f.bytes) raw.contract = decodeContractField(f.bytes);
+          if (f.field === 14 && f.varint != null) raw.timestamp = f.varint;
+          if (f.field === 18 && f.varint != null) raw.fee_limit = f.varint;
+        }
+        if (!raw.contract) throw new Error("No contract inside raw_data — this is not a Tron transaction payload.");
+        return raw;
+      }
+
+      function decodeTransaction(bytes) {
+        let rawBytes = null;
+        const signatures = [];
+        for (const f of decodeFields(bytes)) {
+          if (f.field === 1 && f.bytes && !rawBytes) rawBytes = f.bytes;
+          if (f.field === 2 && f.bytes) signatures.push(bytesToHex(f.bytes));
+        }
+        if (!rawBytes) throw new Error("No raw_data inside the transaction protobuf.");
+        return { rawBytes, signatures };
+      }
+
+      /* ---------- raw_data JSON → protobuf ---------- */
+
+      function encodeRawDataFromJson(rawData) {
+        if (!rawData || !Array.isArray(rawData.contract) || !rawData.contract.length) {
+          throw new Error("raw_data has no contract array.");
+        }
+        const c = rawData.contract[0];
+        const typeName = String(c.type || "");
+        const value = (c.parameter && c.parameter.value) || {};
+        const owner = addressPayload(String(value.owner_address || ""));
+        if (!owner) throw new Error("raw_data contract has no valid owner_address.");
+
+        let contractType;
+        let typeUrl;
+        let parameter;
+        if (typeName === "TransferContract") {
+          contractType = TRANSFER_TYPE;
+          typeUrl = TRANSFER_TYPE_URL;
+          const to = addressPayload(String(value.to_address || ""));
+          if (!to) throw new Error("TransferContract has no valid to_address.");
+          parameter = encodeTransfer(owner, to, BigInt(value.amount ?? 0));
+        } else if (typeName === "TriggerSmartContract") {
+          contractType = TRIGGER_TYPE;
+          typeUrl = TRIGGER_TYPE_URL;
+          const contractAddress = addressPayload(String(value.contract_address || ""));
+          if (!contractAddress) throw new Error("TriggerSmartContract has no valid contract_address.");
+          const data = value.data ? hexToBytes(String(value.data)) : new Uint8Array(0);
+          parameter = encodeTrigger(owner, contractAddress, data);
+        } else {
+          throw new Error("Unsupported contract type: " + (typeName || "(none)"));
+        }
+
+        return encodeRaw({
+          refBlockBytes: hexToBytes(String(rawData.ref_block_bytes || "")),
+          refBlockHash: hexToBytes(String(rawData.ref_block_hash || "")),
+          expiration: BigInt(rawData.expiration ?? 0),
+          timestamp: BigInt(rawData.timestamp ?? 0),
+          feeLimit: rawData.fee_limit != null ? BigInt(rawData.fee_limit) : null,
+          contractType,
+          typeUrl,
+          parameter,
+        });
+      }
+
+      /* ---------- wallet ---------- */
+
+      function renderWallet() {
+        const pill = $("walletPill");
+        pill.classList.toggle("has-wallet", Boolean(wallet));
+        pill.title = wallet ? "Signer " + wallet.address : "Open wallet";
+        $("walletPillText").textContent = wallet ? shortAddress(wallet.address) : "No wallet";
+        if (flow.built) {
+          $("factSigner").textContent = wallet ? shortAddress(wallet.address) : "Not loaded";
+          $("factSigner").classList.toggle("muted", !wallet);
+        }
+        updateFlowUI();
+      }
+
+      function applyWallet(next, message) {
+        const previous = wallet ? wallet.address : "";
+        const changed = previous !== (next ? next.address : "");
+        const lostBuild = changed && flow.built;
+        wallet = next;
+
+        if (next) {
+          $("address").value = next.address;
+          $("privateKey").value = next.privateKey;
+        } else {
+          $("address").value = "";
+          $("privateKey").value = "";
+          $("privateKey").classList.remove("show");
+          $("btnToggleKey").textContent = "Show";
+          $("btnToggleKey").setAttribute("aria-pressed", "false");
+        }
+
+        if (lostBuild) {
+          resetFlow(false);
+          toast("Wallet changed — the owner address is inside raw_data, so rebuild the transaction.", "warn");
+        }
+        renderWallet();
+        if (message) setWalletStatus(message.text, message.type);
+      }
+
+      $("btnGenerate").addEventListener("click", () => {
+        const random = ethers.Wallet.createRandom();
+        const privateKey = random.privateKey.slice(2);
+        const next = { privateKey, address: addressFromPrivateKey(privateKey) };
+        applyWallet(next, { text: "New keypair generated in this tab.", type: "ok" });
+        toast("New wallet generated.", "success");
+      });
+
+      $("btnToggleKey").addEventListener("click", () => {
+        const shown = $("privateKey").classList.toggle("show");
+        $("btnToggleKey").textContent = shown ? "Hide" : "Show";
+        $("btnToggleKey").setAttribute("aria-pressed", shown ? "true" : "false");
+      });
+
+      $("btnDownload").addEventListener("click", () => {
+        if (!wallet) {
+          setWalletStatus("Generate or load a wallet first.", "err");
+          toast("No wallet to download.", "warn");
+          return;
+        }
+        download(
+          "wallet.json",
+          JSON.stringify({ address: wallet.address, privateKey: wallet.privateKey }, null, 2),
+        );
+        setWalletStatus("wallet.json downloaded. Keep it out of git.", "warn");
+      });
+
+      $("btnLoad").addEventListener("click", () => $("file").click());
+
+      $("file").addEventListener("change", async (event) => {
+        const file = event.target.files && event.target.files[0];
+        event.target.value = "";
+        if (!file) return;
+        try {
+          const parsed = JSON.parse(await file.text());
+          const privateKey = privateKeyHex(parsed.privateKey || parsed.private_key);
+          const next = { privateKey, address: addressFromPrivateKey(privateKey) };
+          if (parsed.address && normalizeAddress(parsed.address) !== next.address) {
+            throw new Error("The address in this file does not match its private key.");
+          }
+          applyWallet(next, { text: "Loaded " + file.name + ".", type: "ok" });
+          toast("Wallet loaded.", "success");
+        } catch (error) {
+          const message = error.message || "Could not load this file.";
+          setWalletStatus(message, "err");
+          toast(message, "error");
+        }
+      });
+
+      /* ---------- scan ---------- */
+
+      function clearScan() {
+        $("scanOut").textContent = "";
+        $("btnCopyScan").disabled = true;
+      }
+
+      function clearScanError() {
+        $("scanAddress").closest(".field").classList.remove("is-invalid");
+        $("scanError").textContent = "";
+      }
+
+      function handleScan() {
+        const raw = $("scanAddress").value.trim();
+        const field = $("scanAddress").closest(".field");
+        const error = $("scanError");
+
+        if (!raw || !isTronAddress(raw)) {
+          field.classList.add("is-invalid");
+          error.textContent = raw ? "Not a valid Tron address." : "Enter an address to watch.";
+          clearScan();
+          return;
+        }
+
+        field.classList.remove("is-invalid");
+        error.textContent = "";
+        const payload = {
+          operation: "ADDRESS_OPERATION_ADD",
+          addresses: [normalizeAddress(raw)],
+        };
+        $("scanOut").textContent = JSON.stringify(payload, null, 2);
+        $("scanOut").scrollTop = 0;
+        $("scanOut").scrollLeft = 0;
+        $("btnCopyScan").disabled = false;
+        toast("Watch-list payload built.", "success");
+      }
+
+      $("btnScan").addEventListener("click", handleScan);
+
+      $("scanAddress").addEventListener("input", () => {
+        clearScanError();
+        if ($("scanOut").textContent) clearScan();
+      });
+
+      $("btnUseWallet").addEventListener("click", () => {
+        if (!wallet) {
+          toast("No wallet loaded yet.", "warn");
+          return;
+        }
+        $("scanAddress").value = wallet.address;
+        clearScanError();
+        clearScan();
+      });
+
+      /* ---------- live block fetch ---------- */
+
+      async function fetchLatestBlock() {
+        const button = $("btnFetchBlock");
+        setButtonBusy(button, true, "Fetching…");
+        setBlockStatus("Fetching latest block from TronGrid…", "warn");
+        try {
+          const response = await fetch(TRONGRID_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: "{}",
+            cache: "no-store",
+            signal: AbortSignal.timeout(10_000),
+          });
+          if (!response.ok) throw new Error("HTTP " + response.status);
+          const block = await response.json();
+          const raw = block && block.block_header && block.block_header.raw_data;
+          const number = raw && raw.number;
+          const blockID = block && block.blockID;
+          if (
+            !Number.isSafeInteger(number) ||
+            typeof blockID !== "string" ||
+            !/^[0-9a-fA-F]{64}$/.test(blockID)
+          ) {
+            throw new Error("unexpected response");
+          }
+          const blockTime = Number.isSafeInteger(raw.timestamp) ? raw.timestamp : Date.now();
+          $("refBlockBytes").value = (number % 0x10000).toString(16).padStart(4, "0");
+          $("refBlockHash").value = blockID.slice(16, 32).toLowerCase();
+          $("timestamp").value = String(blockTime);
+          $("expiration").value = String(blockTime + 60_000);
+          setBlockStatus("Filled from block #" + number + ". Re-fetch right before broadcasting.", "ok");
+          onFormChanged();
+        } catch (error) {
+          setBlockStatus("Could not fetch the block: " + error.message, "err");
+          toast("Block fetch failed — fill the four fields manually.", "error");
+        } finally {
+          setButtonBusy(button, false);
+        }
+      }
+
+      $("btnFetchBlock").addEventListener("click", fetchLatestBlock);
+
+      /* ---------- collect: form state ---------- */
+
+      function readForm() {
+        return {
+          to: $("to").value.trim(),
+          amount: $("amount").value.trim(),
+          transactionId: $("transactionId").value.trim(),
+          tokenId: $("tokenId").value.trim(),
+          contract: $("contract").value.trim(),
+          feeLimit: $("feeLimit").value.trim(),
+          refBlockBytes: $("refBlockBytes").value.trim(),
+          refBlockHash: $("refBlockHash").value.trim(),
+          expiration: $("expiration").value.trim(),
+          timestamp: $("timestamp").value.trim(),
+        };
+      }
+
+      function updateAmountHint() {
+        const raw = $("amount").value.trim();
+        const trc20 = $("contract").value.trim() !== "";
+        const hint = $("amountHint");
+        if (!raw) {
+          hint.textContent = trc20
+            ? "Token base units — decimals come from the token (USDT = 6)."
+            : "Atomic units — 1 TRX = 1000000 sun.";
+          return;
+        }
+        if (!ATOMIC.test(raw)) {
+          hint.textContent = trc20 ? "Token base units (integer)." : "Atomic units (integer).";
+          return;
+        }
+        if (trc20) {
+          hint.textContent = "Token base units — check the token's decimals.";
+          return;
+        }
+        hint.textContent = "≈ " + formatSun(raw);
+      }
+
+      function updateAssetUI() {
+        $("fieldFeeLimit").hidden = $("contract").value.trim() === "";
+      }
+
+      function validateCollect(values) {
+        const errors = {};
+        const trc20 = values.contract !== "";
+
+        if (!values.to) errors.to = "Recipient is required.";
+        else if (!isTronAddress(values.to)) errors.to = "Not a valid Tron address (T… or 41… hex).";
+
+        if (!values.amount) errors.amount = "Amount is required.";
+        else if (!ATOMIC.test(values.amount)) errors.amount = "Use whole atomic units — no decimals or separators.";
+
+        if (!TX_ID.test(values.transactionId)) {
+          errors.transactionId = '1–64 chars of letters, digits, "_" or "-".';
+        }
+
+        if (!TOKEN_ID.test(values.tokenId)) errors.tokenId = "Use a positive integer.";
+
+        if (values.contract && !isTronAddress(values.contract)) {
+          errors.contract = "Not a valid Tron contract address.";
+        }
+
+        if (trc20 && values.feeLimit && !UINT_POS.test(values.feeLimit)) {
+          errors.feeLimit = "Positive integer in sun.";
+        }
+
+        if (!HEX_4.test(values.refBlockBytes)) errors.refBlockBytes = "Exactly 4 hex chars.";
+        if (!HEX_16.test(values.refBlockHash)) errors.refBlockHash = "Exactly 16 hex chars.";
+
+        if (values.expiration && !UINT.test(values.expiration)) errors.expiration = "Milliseconds, integer ≥ 0.";
+        if (values.timestamp && !UINT.test(values.timestamp)) errors.timestamp = "Milliseconds, integer ≥ 0.";
+
+        return errors;
+      }
+
+      function clearFieldErrors() {
+        $$("#txForm .field.is-invalid").forEach((field) => field.classList.remove("is-invalid"));
+        $$("#txForm .field-err").forEach((el) => { el.textContent = ""; });
+        $("buildError").hidden = true;
+      }
+
+      function showFieldErrors(errors) {
+        const entries = Object.entries(errors);
+        entries.forEach(([key, message]) => {
+          const field = document.querySelector('#txForm [data-field="' + key + '"]');
+          if (!field) return;
+          field.classList.add("is-invalid");
+          const el = field.querySelector(".field-err");
+          if (el) el.textContent = message;
+        });
+        const firstField = document.querySelector('#txForm [data-field="' + entries[0][0] + '"]');
+        const input = firstField ? firstField.querySelector("input") : null;
+        if (input) {
+          input.focus({ preventScroll: true });
+          input.scrollIntoView({ behavior: scrollBehavior(), block: "center" });
+        }
+      }
+
+      /* ---------- collect: build ---------- */
+
+      function constructTransaction(values) {
+        const isTrc20 = values.contract !== "";
+        const owner = wallet ? wallet.address : "";
+        if (!owner) throw new Error("No wallet loaded.");
+
+        const from = normalizeAddress(owner);
+        const toAddress = normalizeAddress(values.to);
+        if (from === toAddress || from === ZERO_ADDRESS || toAddress === ZERO_ADDRESS) {
+          throw new Error("from_address and to_address must differ and cannot be the zero address.");
+        }
+
+        const now = Date.now();
+        const expiration = BigInt(values.expiration || String(now + 60_000));
+        const timestamp = BigInt(values.timestamp || String(now));
+        const maxSafe = BigInt(Number.MAX_SAFE_INTEGER);
+        if (expiration > maxSafe || timestamp > maxSafe) {
+          throw new Error("expiration and timestamp must be safe integers.");
+        }
+
+        const refBlockBytesHex = values.refBlockBytes.toLowerCase();
+        const refBlockHashHex = values.refBlockHash.toLowerCase();
+        const amount = values.amount;
+
+        let contractType;
+        let typeUrl;
+        let parameter;
+        let value;
+        let feeLimit = null;
+
+        if (isTrc20) {
+          const contractAddress = normalizeAddress(values.contract);
+          if (contractAddress === from || contractAddress === ZERO_ADDRESS) {
+            throw new Error("contract cannot be the signer or the zero address.");
+          }
+          const toWord = bytesToHex(addressPayload(toAddress).slice(1)).padStart(64, "0");
+          const amountWord = BigInt(amount).toString(16).padStart(64, "0");
+          const data = hexToBytes("a9059cbb" + toWord + amountWord);
+          parameter = encodeTrigger(addressPayload(from), addressPayload(contractAddress), data);
+          contractType = TRIGGER_TYPE;
+          typeUrl = TRIGGER_TYPE_URL;
+          feeLimit = BigInt(values.feeLimit || "100000000");
+          if (feeLimit <= 0n || feeLimit > maxSafe) {
+            throw new Error("fee_limit must be a positive integer in sun.");
+          }
+          value = {
+            owner_address: addressHex(from),
+            contract_address: addressHex(contractAddress),
+            data: bytesToHex(data),
+            call_value: 0,
+          };
+        } else {
+          parameter = encodeTransfer(addressPayload(from), addressPayload(toAddress), amount);
+          contractType = TRANSFER_TYPE;
+          typeUrl = TRANSFER_TYPE_URL;
+          value = {
+            amount: BigInt(amount) <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(amount) : amount,
+            owner_address: addressHex(from),
+            to_address: addressHex(toAddress),
+          };
+        }
+
+        const rawData = {
+          contract: [
+            {
+              parameter: { value, type_url: typeUrl },
+              type: isTrc20 ? "TriggerSmartContract" : "TransferContract",
+            },
+          ],
+          ref_block_bytes: refBlockBytesHex,
+          ref_block_hash: refBlockHashHex,
+          expiration: Number(expiration),
+          timestamp: Number(timestamp),
+        };
+        if (feeLimit != null) rawData.fee_limit = Number(feeLimit);
+
+        return {
+          rawData,
+          parts: {
+            refBlockBytes: hexToBytes(refBlockBytesHex),
+            refBlockHash: hexToBytes(refBlockHashHex),
+            expiration,
+            timestamp,
+            feeLimit,
+            contractType,
+            typeUrl,
+            parameter,
+          },
+          isTrc20,
+          from,
+          toAddress,
+          amount,
+        };
+      }
+
+      function applyBuilt(values, built) {
+        flow.built = true;
+        flow.hashed = false;
+        flow.signed = false;
+        flow.values = values;
+        flow.snapshot = JSON.stringify(values);
+        flow.owner = built.from;
+        flow.rawData = built.rawData;
+        flow.parts = built.parts;
+        flow.isTrc20 = built.isTrc20;
+        flow.toAddress = built.toAddress;
+        flow.amount = built.amount;
+        flow.raw = null;
+        flow.rawHex = "";
+        flow.txId = "";
+        flow.signature = "";
+        flow.signatureParts = null;
+        flow.recovered = "";
+        flow.item = null;
+        flow.itemText = "";
+        flow.requestText = "";
+
+        ["result-2", "result-3", "result-4"].forEach((id) => { $(id).hidden = true; });
+        ["unsignedHash", "unsignedRlp", "signedTx", "signedTxHash", "signatureJson", "itemJson", "requestJson"].forEach((id) => {
+          setCode(id, "");
+        });
+        $("buildError").hidden = true;
+        $("hashChip").textContent = "—";
+
+        setCode("txJsonPreview", JSON.stringify({ visible: false, raw_data: built.rawData }, null, 2));
+        $("txTypeChip").textContent = built.isTrc20 ? "TRC-20 · TriggerSmartContract" : "Native TRX · TransferContract";
+        $("factMode").textContent = built.isTrc20 ? "TRC-20" : "Native TRX";
+        $("factAmount").textContent = built.isTrc20
+          ? built.amount.toString() + " token units"
+          : formatSun(built.amount);
+        $("factFee").textContent = built.isTrc20 ? "energy · limit " + formatSun(built.rawData.fee_limit) : "bandwidth burn";
+        $("factSigner").textContent = shortAddress(built.from);
+        $("factSigner").classList.remove("muted");
+        $("trc20Note").hidden = !built.isTrc20;
+        if (built.isTrc20) {
+          $("trc20Note").textContent =
+            "Calldata → transfer(" + built.toAddress + ", " + built.amount +
+            "). The tx is sent to the token contract; the recipient and amount are encoded in data.";
+        }
+        $("result-1").hidden = false;
+        updateFlowUI();
+      }
+
+      function renderHash() {
+        const raw = encodeRaw(flow.parts);
+        const rawHex = bytesToHex(raw);
+        const txId = bytesToHex(sha256(raw));
+        flow.raw = raw;
+        flow.rawHex = rawHex;
+        flow.txId = txId;
+        setCode("unsignedHash", txId);
+        setCode("unsignedRlp", rawHex);
+        $("rlpMeta").textContent = raw.length + " bytes · protobuf";
+        $("hashChip").textContent = shortHash(txId);
+        $("result-2").hidden = false;
+      }
+
+      function renderSignature(signedTxJson) {
+        setCode("signedTx", signedTxJson);
+        setCode("signedTxHash", flow.txId);
+        setCode("signatureJson", JSON.stringify(flow.signatureParts, null, 2));
+        $("verifyText").textContent =
+          "Recovered signer " + flow.recovered + " matches the loaded wallet and the owner address.";
+        $("hashChip").textContent = shortHash(flow.txId);
+        $("result-3").hidden = false;
+      }
+
+      function renderExport() {
+        setCode("itemJson", flow.itemText);
+        setCode("requestJson", flow.requestText);
+        $("result-4").hidden = false;
+      }
+
+      function resetFlow(showToast) {
+        flow.built = false;
+        flow.hashed = false;
+        flow.signed = false;
+        flow.values = null;
+        flow.snapshot = "";
+        flow.owner = "";
+        flow.rawData = null;
+        flow.parts = null;
+        flow.raw = null;
+        flow.rawHex = "";
+        flow.txId = "";
+        flow.isTrc20 = false;
+        flow.toAddress = "";
+        flow.amount = "";
+        flow.signature = "";
+        flow.signatureParts = null;
+        flow.recovered = "";
+        flow.item = null;
+        flow.itemText = "";
+        flow.requestText = "";
+
+        ["result-1", "result-2", "result-3", "result-4", "buildError"].forEach((id) => {
+          $(id).hidden = true;
+        });
+        ["txJsonPreview", "unsignedHash", "unsignedRlp", "signedTx", "signedTxHash", "signatureJson", "itemJson", "requestJson"].forEach((id) => {
+          setCode(id, "");
+        });
+        $("hashChip").textContent = "—";
+        clearFieldErrors();
+        updateFlowUI();
+        if (showToast) toast("Flow reset. Form values are kept.", "success");
+      }
+
+      /* ---------- collect: UI state ---------- */
+
+      function setStepState(n, state, label) {
+        const card = $("step-" + n);
+        card.classList.toggle("is-locked", state === "locked");
+        card.classList.toggle("is-done", state === "done");
+        card.classList.toggle("is-current", state === "ready");
+        const pill = $("status-" + n);
+        pill.className = "pill " + state;
+        pill.textContent = label;
+        card.querySelector(".step-number").textContent = state === "done" ? "✓" : String(n);
+      }
+
+      function updateFlowUI() {
+        const completed = [flow.built, flow.hashed, flow.signed];
+        const unlocked = [true, flow.built, flow.hashed, flow.signed];
+
+        setStepState(1, flow.built ? "done" : "ready", flow.built ? "Built" : "Ready");
+        setStepState(2, !flow.built ? "locked" : flow.hashed ? "done" : "ready",
+          !flow.built ? "Locked" : flow.hashed ? "Hashed" : "Ready");
+        setStepState(3, !flow.hashed ? "locked" : flow.signed ? "done" : "ready",
+          !flow.hashed ? "Locked" : flow.signed ? "Signed" : "Ready");
+        setStepState(4, flow.signed ? "ready" : "locked", flow.signed ? "Ready" : "Locked");
+
+        const steps = $$(".stepper-step");
+        steps.forEach((step, index) => {
+          step.classList.toggle("done", completed[index]);
+          step.classList.toggle("current", !completed[index] && unlocked[index]);
+          step.classList.toggle("locked", !unlocked[index]);
+          step.disabled = !unlocked[index];
+          step.querySelector(".node-dot").textContent = completed[index] ? "✓" : String(index + 1);
+        });
+        const completedCount = completed.filter(Boolean).length;
+        $("stepperFill").style.width = (completedCount / 3) * 100 + "%";
+
+        $("lock-2").hidden = flow.built;
+        $("body-2").hidden = !flow.built;
+        $("lock-3").hidden = flow.hashed;
+        $("body-3").hidden = !flow.hashed;
+        $("lock-4").hidden = flow.signed;
+        $("body-4").hidden = !flow.signed;
+
+        $("buildGate").hidden = Boolean(wallet);
+        $("btnBuild").disabled = !wallet || flow.busy;
+        $("btnHash").disabled = !flow.built || flow.hashed || flow.busy;
+        $("btnSign").disabled = !flow.hashed || flow.signed || !wallet || flow.busy;
+        $("signerChip").textContent = wallet ? shortAddress(wallet.address) : "no wallet";
+        $("hashChip").textContent = flow.txId ? shortHash(flow.txId) : "—";
+        $("collectBadge").textContent = flow.signed ? "signed" : "4 steps";
+        $("collectBadge").classList.toggle("ok", flow.signed);
+        $("btnInspectFromFlow").disabled = !flow.built;
+
+        if (flow.built) {
+          $("factSigner").textContent = wallet ? shortAddress(wallet.address) : "Not loaded";
+          $("factSigner").classList.toggle("muted", !wallet);
+        }
+      }
+
+      /* ---------- collect: actions ---------- */
+
+      function onFormChanged() {
+        updateAmountHint();
+        updateAssetUI();
+        if (!flow.built) return;
+        if (JSON.stringify(readForm()) === flow.snapshot) return;
+        const wasSigned = flow.signed;
+        resetFlow(false);
+        toast(
+          wasSigned
+            ? "Inputs changed — the signed payload was cleared. Rebuild to start again."
+            : "Inputs changed — rebuild the transaction.",
           "warn",
         );
-      } catch (error) {
-        lastJson = "";
-        $("signOut").textContent = "";
-        statusEl("signStatus", error.message, "err");
       }
-    };
 
-    $("btnCopySign").onclick = async () => {
-      if (!lastJson) return;
-      await copy(lastJson);
-      statusEl("signStatus", "Copied.", "ok");
-    };
+      async function handleBuild(event) {
+        event.preventDefault();
+        if (flow.busy) return;
+        if (!wallet) {
+          toast("Load or generate a wallet first — the owner address is part of raw_data.", "warn");
+          switchTab("wallet");
+          return;
+        }
+
+        clearFieldErrors();
+        const values = readForm();
+        const errors = validateCollect(values);
+        if (Object.keys(errors).length) {
+          showFieldErrors(errors);
+          toast("Fix the highlighted fields.", "error");
+          return;
+        }
+
+        flow.busy = true;
+        setButtonBusy($("btnBuild"), true, "Building…");
+        try {
+          await wait(260);
+          const built = constructTransaction(values);
+          applyBuilt(values, built);
+          toast("Unsigned transaction built.", "success");
+          scrollToResult("result-1");
+        } catch (error) {
+          $("buildError").textContent = error.message || "Could not build the transaction.";
+          $("buildError").hidden = false;
+          toast("Build failed.", "error");
+        } finally {
+          flow.busy = false;
+          setButtonBusy($("btnBuild"), false);
+          updateFlowUI();
+        }
+      }
+
+      async function handleHash() {
+        if (!flow.built || flow.hashed || flow.busy) return;
+
+        flow.busy = true;
+        setButtonBusy($("btnHash"), true, "Encoding…");
+        try {
+          await wait(300);
+          flow.hashed = true;
+          renderHash();
+          updateFlowUI();
+          toast("Protobuf encoded and txID computed.", "success");
+          scrollToResult("result-2");
+        } catch (error) {
+          toast(error.message || "Could not encode raw_data.", "error");
+        } finally {
+          flow.busy = false;
+          setButtonBusy($("btnHash"), false);
+          updateFlowUI();
+        }
+      }
+
+      async function handleSign() {
+        if (!flow.hashed || flow.signed || flow.busy) return;
+        if (!wallet) {
+          toast("Load or generate a wallet first.", "warn");
+          switchTab("wallet");
+          return;
+        }
+
+        flow.busy = true;
+        setButtonBusy($("btnSign"), true, "Signing…");
+        try {
+          await wait(340);
+
+          const recomputed = bytesToHex(sha256(flow.raw));
+          if (recomputed !== flow.txId) {
+            throw new Error("The raw_data hash no longer matches step 2 — rebuild the transaction.");
+          }
+
+          const digest = "0x" + flow.txId;
+          const sig = new ethers.SigningKey("0x" + wallet.privateKey).sign(digest);
+          const signature = (
+            sig.r.slice(2).padStart(64, "0") +
+            sig.s.slice(2).padStart(64, "0") +
+            Number(sig.v).toString(16).padStart(2, "0")
+          ).toLowerCase();
+
+          const publicKey = ethers.SigningKey.recoverPublicKey(digest, sig.serialized);
+          const hash = ethers.keccak256("0x" + publicKey.slice(4));
+          const recovered = addressFromBytes(hexToBytes("41" + hash.slice(-40)));
+
+          if (!recovered) throw new Error("Could not recover the signer from the signature.");
+          if (recovered !== wallet.address || recovered !== flow.owner) {
+            throw new Error("Recovered signer does not match the loaded wallet.");
+          }
+
+          const signedTx = {
+            visible: false,
+            txID: flow.txId,
+            raw_data: flow.rawData,
+            raw_data_hex: flow.rawHex,
+            signature: [signature],
+          };
+
+          flow.signature = signature;
+          flow.signatureParts = {
+            r: "0x" + signature.slice(0, 64),
+            s: "0x" + signature.slice(64, 128),
+            v: parseInt(signature.slice(128), 16),
+            bytes: 65,
+          };
+          flow.recovered = recovered;
+          flow.item = {
+            transaction_id: flow.values.transactionId,
+            from_address: flow.owner,
+            to_address: flow.toAddress,
+            token_id: flow.values.tokenId,
+            amount: flow.amount,
+            signed_tx: JSON.stringify(signedTx),
+          };
+          flow.itemText = JSON.stringify(flow.item, null, 2);
+          flow.requestText = JSON.stringify({ items: [flow.item] }, null, 2);
+          flow.signed = true;
+
+          renderSignature(JSON.stringify(signedTx, null, 2));
+          renderExport();
+          updateFlowUI();
+          toast("Signature verified — final JSON is ready.", "success");
+          scrollToStep(4);
+        } catch (error) {
+          toast(error.message || "Signing failed.", "error");
+        } finally {
+          flow.busy = false;
+          setButtonBusy($("btnSign"), false);
+          updateFlowUI();
+        }
+      }
+
+      /* ---------- inspect ---------- */
+
+      let inspectBusy = false;
+
+      function setInspectStatus(text, type) {
+        const el = $("inspectStatus");
+        el.textContent = text || "";
+        el.className = "status-line" + (type ? " " + type : "");
+      }
+
+      function clearInspectError() {
+        $("inspectInput").closest(".field").classList.remove("is-invalid");
+        $("inspectError").textContent = "";
+      }
+
+      function clearInspectResult() {
+        $("inspectResult").hidden = true;
+        ["inspectHash", "inspectJson", "inspectRlp"].forEach((id) => setCode(id, ""));
+        $("inspectSignerBox").hidden = true;
+        $("inspectTxIdWarn").hidden = true;
+      }
+
+      function parseInspectInput(text) {
+        const trimmed = text.trim();
+        if (!trimmed) throw new Error("Paste a transaction first.");
+
+        if (trimmed.startsWith("{")) {
+          let obj;
+          try {
+            obj = JSON.parse(trimmed);
+          } catch {
+            throw new Error("This is not valid JSON.");
+          }
+          let kind = "tx JSON";
+          if (obj && Array.isArray(obj.items)) {
+            if (!obj.items.length) throw new Error("This request has no items.");
+            obj = obj.items[0];
+            kind = "Collect request";
+          }
+          if (obj && typeof obj.signed_tx === "string") {
+            try {
+              obj = JSON.parse(obj.signed_tx);
+            } catch {
+              throw new Error("signed_tx inside this item is not valid JSON.");
+            }
+            kind = "Collect item";
+          }
+          if (!obj || typeof obj !== "object" || !obj.raw_data) {
+            throw new Error("No raw_data or raw_data_hex found in this JSON.");
+          }
+          let rawBytes;
+          if (typeof obj.raw_data_hex === "string" && obj.raw_data_hex) {
+            rawBytes = hexToBytes(obj.raw_data_hex);
+          } else {
+            rawBytes = encodeRawDataFromJson(obj.raw_data);
+          }
+          const signatures = obj.signature
+            ? (Array.isArray(obj.signature) ? obj.signature : [obj.signature]).map(String)
+            : [];
+          return {
+            rawBytes,
+            signatures,
+            declaredTxId: typeof obj.txID === "string" ? obj.txID.toLowerCase() : null,
+            kind,
+          };
+        }
+
+        const bytes = hexToBytes(trimmed);
+        if (!bytes.length) throw new Error("Empty payload.");
+        // A real raw_data always carries the contract (field 11); try that shape first.
+        try {
+          decodeRawData(bytes);
+          return { rawBytes: bytes, signatures: [], declaredTxId: null, kind: "raw_data_hex" };
+        } catch {
+          // Fall through: maybe it is a full Transaction protobuf (field 1 = raw_data).
+        }
+        const tx = decodeTransaction(bytes);
+        return { rawBytes: tx.rawBytes, signatures: tx.signatures, declaredTxId: null, kind: "Transaction protobuf" };
+      }
+
+      function expiryLabel(expirationMs) {
+        if (expirationMs == null) return "—";
+        const delta = Number(expirationMs) - Date.now();
+        if (delta <= 0) return "expired";
+        if (delta < 90_000) return Math.round(delta / 1000) + "s left";
+        if (delta < 90 * 60_000) return Math.round(delta / 60_000) + "m left";
+        return Math.round(delta / 3_600_000) + "h left";
+      }
+
+      function inspectAmount(raw) {
+        const c = raw.contract;
+        if (c.typeNum === TRANSFER_TYPE) return c.parameter.amount;
+        if (c.typeNum === TRIGGER_TYPE && c.parameter.decoded_call) return c.parameter.decoded_call.amount;
+        return null;
+      }
+
+      function inspectCallout(raw) {
+        const c = raw.contract;
+        if (c.typeNum === TRANSFER_TYPE) {
+          return "Native TRX transfer: " + c.parameter.amount + " sun (≈ " + formatSun(c.parameter.amount) +
+            ") from " + c.parameter.owner_address + " to " + c.parameter.to_address + ".";
+        }
+        if (c.typeNum === TRIGGER_TYPE && c.parameter.decoded_call) {
+          const call = c.parameter.decoded_call;
+          return "TRC-20 transfer(" + call.to + ", " + call.amount + ") via contract " +
+            c.parameter.contract_address + ". Raw calldata is in the decoded JSON.";
+        }
+        if (c.typeNum === TRIGGER_TYPE) {
+          return "Smart-contract call to " + c.parameter.contract_address + " with " +
+            (c.parameter.data.length / 2) + " bytes of calldata.";
+        }
+        return "Contract type " + c.type + " — raw fields are in the decoded JSON.";
+      }
+
+      function decodedJson(raw) {
+        const out = {
+          ref_block_bytes: raw.ref_block_bytes || "",
+          ref_block_hash: raw.ref_block_hash || "",
+          expiration: raw.expiration != null ? Number(raw.expiration) : null,
+          timestamp: raw.timestamp != null ? Number(raw.timestamp) : null,
+          contract: {
+            type: raw.contract.type,
+            type_url: raw.contract.typeUrl,
+            parameter: raw.contract.parameter,
+          },
+        };
+        if (raw.fee_limit != null) out.fee_limit = Number(raw.fee_limit);
+        return out;
+      }
+
+      function recoverSigner(txIdHex, signatureHex) {
+        const sig = signatureHex.replace(/^0x/, "");
+        if (sig.length !== 130) throw new Error("Signature is not 65 bytes.");
+        let v = parseInt(sig.slice(128), 16);
+        if (v < 27) v += 27;
+        const normalized = "0x" + sig.slice(0, 128) + v.toString(16).padStart(2, "0");
+        const publicKey = ethers.SigningKey.recoverPublicKey("0x" + txIdHex, normalized);
+        const hash = ethers.keccak256("0x" + publicKey.slice(4));
+        return addressFromBytes(hexToBytes("41" + hash.slice(-40)));
+      }
+
+      function renderInspect(parsed) {
+        const raw = decodeRawData(parsed.rawBytes);
+        const rawHex = bytesToHex(parsed.rawBytes);
+        const txId = bytesToHex(sha256(parsed.rawBytes));
+        const amount = inspectAmount(raw);
+
+        $("inspectType").textContent = raw.contract.type;
+        $("inspectAmount").textContent = amount != null
+          ? amount + (raw.contract.typeNum === TRANSFER_TYPE ? " sun" : "")
+          : "—";
+        $("inspectExpiry").textContent = expiryLabel(raw.expiration != null ? Number(raw.expiration) : null);
+        $("inspectKind").textContent = parsed.kind;
+
+        setCode("inspectHash", txId);
+        setCode("inspectJson", JSON.stringify(decodedJson(raw), null, 2));
+        setCode("inspectRlp", rawHex);
+        $("inspectRlpMeta").textContent = parsed.rawBytes.length + " bytes · protobuf";
+        $("inspectData").textContent = inspectCallout(raw);
+
+        $("inspectTxIdWarn").hidden = true;
+        if (parsed.declaredTxId && parsed.declaredTxId !== txId) {
+          const warn = $("inspectTxIdWarn");
+          warn.hidden = false;
+          warn.textContent = "The txID in this payload does not match the recomputed hash — the raw_data was modified after it was hashed.";
+        }
+
+        const box = $("inspectSignerBox");
+        box.hidden = true;
+        if (parsed.signatures.length) {
+          try {
+            const recovered = recoverSigner(txId, parsed.signatures[0]);
+            const owner = raw.contract.parameter.owner_address || "";
+            const matches = Boolean(recovered) && Boolean(owner) && recovered === owner;
+            $("inspectSignerTitle").textContent = matches ? "Signature verified" : "Signer mismatch";
+            $("inspectSignerText").textContent = matches
+              ? "Recovered signer " + recovered + " matches owner_address."
+              : "Recovered signer " + (recovered || "unknown") + " does not match owner_address " + owner + ".";
+            box.hidden = false;
+          } catch (error) {
+            $("inspectSignerTitle").textContent = "Signature present";
+            $("inspectSignerText").textContent = "Could not verify it: " + error.message;
+            box.hidden = false;
+          }
+        }
+
+        $("inspectResult").hidden = false;
+        const expired = raw.expiration != null && Number(raw.expiration) < Date.now();
+        setInspectStatus(
+          (parsed.signatures.length ? "Decoded and the signature was verified against the owner address." :
+            "Decoded successfully. The txID was recomputed from the protobuf bytes.") +
+            (expired ? " Note: this transaction has expired — refetch a block and sign again." : ""),
+          expired ? "warn" : "ok",
+        );
+      }
+
+      async function handleInspect() {
+        if (inspectBusy) return;
+        clearInspectError();
+        clearInspectResult();
+        setInspectStatus("");
+
+        let parsed;
+        try {
+          parsed = parseInspectInput($("inspectInput").value);
+        } catch (error) {
+          const message = error.message || "Could not decode this transaction.";
+          $("inspectInput").closest(".field").classList.add("is-invalid");
+          $("inspectError").textContent = message;
+          setInspectStatus("Decode failed — check the pasted payload.", "err");
+          toast("Could not decode the transaction.", "error");
+          return;
+        }
+
+        inspectBusy = true;
+        setButtonBusy($("btnInspect"), true, "Decoding…");
+        setInspectStatus("Decoding protobuf and computing sha256(raw_data)…");
+        try {
+          await wait(220);
+          renderInspect(parsed);
+          toast("Transaction decoded.", "success");
+          scrollToResult("inspectResult");
+        } catch (error) {
+          const message = error.message || "Could not decode this transaction.";
+          $("inspectInput").closest(".field").classList.add("is-invalid");
+          $("inspectError").textContent = message;
+          setInspectStatus("Decode failed.", "err");
+          toast(message, "error");
+        } finally {
+          inspectBusy = false;
+          setButtonBusy($("btnInspect"), false);
+        }
+      }
+
+      $("btnInspect").addEventListener("click", handleInspect);
+
+      $("inspectInput").addEventListener("input", () => {
+        clearInspectError();
+        if (!$("inspectResult").hidden) {
+          clearInspectResult();
+          setInspectStatus("Input changed — decode again.", "warn");
+        }
+      });
+
+      $("btnInspectClear").addEventListener("click", () => {
+        $("inspectInput").value = "";
+        clearInspectError();
+        clearInspectResult();
+        setInspectStatus("");
+        $("inspectInput").focus();
+      });
+
+      $("btnInspectFromFlow").addEventListener("click", () => {
+        if (!flow.built) {
+          toast("Build a transaction in Collect first.", "warn");
+          return;
+        }
+        $("inspectInput").value = flow.hashed
+          ? flow.rawHex
+          : JSON.stringify({ visible: false, raw_data: flow.rawData }, null, 2);
+        clearInspectError();
+        handleInspect();
+      });
+
+      /* ---------- wiring ---------- */
+
+      $("txForm").addEventListener("submit", handleBuild);
+      $("btnHash").addEventListener("click", handleHash);
+      $("btnSign").addEventListener("click", handleSign);
+      $("btnResetFlow").addEventListener("click", () => resetFlow(true));
+      $("btnOpenWallet").addEventListener("click", () => switchTab("wallet"));
+      $("btnGotoExport").addEventListener("click", () => scrollToStep(4));
+      $("btnUseUsdt").addEventListener("click", () => {
+        $("contract").value = USDT_CONTRACT;
+        onFormChanged();
+      });
+
+      ["to", "amount", "transactionId", "tokenId", "contract", "feeLimit", "refBlockBytes", "refBlockHash", "expiration", "timestamp"].forEach((id) => {
+        $(id).addEventListener("input", onFormChanged);
+      });
+
+      $$(".stepper-step").forEach((step) => {
+        step.addEventListener("click", () => {
+          const n = Number(step.dataset.goto);
+          if (!step.disabled) scrollToStep(n);
+        });
+      });
+
+      $("btnDownloadItem").addEventListener("click", () => {
+        if (!flow.itemText) return;
+        download("collect-item.json", flow.itemText);
+        toast("Item downloaded.", "success");
+      });
+
+      $("btnDownloadRequest").addEventListener("click", () => {
+        if (!flow.requestText) return;
+        download("collect-request.json", flow.requestText);
+        toast("Request downloaded.", "success");
+      });
+
+      /* ---------- init ---------- */
+
+      updateAmountHint();
+      updateAssetUI();
+      renderWallet();
+    })();
   </script>
 </body>
 </html>
